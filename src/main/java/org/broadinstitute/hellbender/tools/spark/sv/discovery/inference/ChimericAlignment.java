@@ -13,7 +13,6 @@ import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.Assembly
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.StrandSwitch;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SvCigarUtils;
 import org.broadinstitute.hellbender.utils.IntervalUtils;
-import org.broadinstitute.hellbender.utils.SimpleInterval;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -67,14 +66,10 @@ public class ChimericAlignment {
     public final AlignmentInterval regionWithLowerCoordOnContig;
     public final AlignmentInterval regionWithHigherCoordOnContig;
 
-    public final StrandSwitch strandSwitch;
-    public final boolean isForwardStrandRepresentation;
+    final StrandSwitch strandSwitch;
+    final boolean isForwardStrandRepresentation;
 
     public final List<String> insertionMappings;
-
-    public List<AlignmentInterval> getAlignmentIntervals() {
-        return Arrays.asList(regionWithLowerCoordOnContig, regionWithHigherCoordOnContig);
-    }
 
     protected ChimericAlignment(final Kryo kryo, final Input input) {
 
@@ -116,10 +111,134 @@ public class ChimericAlignment {
         this.insertionMappings = insertionMappings;
     }
 
+    /**
+     * See
+     * {@link AssemblyContigAlignmentSignatureClassifier#isLikelySimpleTranslocation(AlignmentInterval, AlignmentInterval, StrandSwitch)}
+     * for definition of "simple translocations".
+     */
+    boolean isLikelySimpleTranslocation() {
+        return AssemblyContigAlignmentSignatureClassifier.isLikelySimpleTranslocation(regionWithLowerCoordOnContig, regionWithHigherCoordOnContig, strandSwitch);
+    }
+
+    /**
+     * See {@link AssemblyContigAlignmentSignatureClassifier#isLikelyInvertedDuplication(AlignmentInterval, AlignmentInterval)}
+     */
+    boolean isLikelyInvertedDuplication() {
+        return AssemblyContigAlignmentSignatureClassifier.isLikelyInvertedDuplication(regionWithLowerCoordOnContig, regionWithHigherCoordOnContig);
+    }
+
+    boolean isNeitherSimpleTranslocationNorIncompletePicture() {
+        return !isLikelySimpleTranslocation()
+                &&
+                !AssemblyContigAlignmentSignatureClassifier.hasIncompletePictureFromTwoAlignments(regionWithLowerCoordOnContig, regionWithHigherCoordOnContig);
+    }
+
+    /**
+     * An SV event could be detected from a contig that seem originate from the forward or reverse strand of the reference,
+     * besides the annotation that the alignment flanking regions might flank either side of the two breakpoints.
+     *
+     * <p> The definition for '+' representation is such that:
+     *     <ul>
+     *         <li>For events involving alignments to the same chromosome (with or without strand switch),
+     *              1) the two alignments are mapped to the '+' reference strand when there is NO strand switch
+     *              2) {@code regionWithLowerCoordOnContig} ends earlier on the reference than
+     *                 {@code regionWithHigherCoordOnContig} does when
+     *                 {@code regionWithLowerCoordOnContig} is '+' and {@code regionWithHigherCoordOnContig} is '-'
+     *              3) {@code regionWithLowerCoordOnContig} starts earlier on the reference than
+     *                 {@code regionWithHigherCoordOnContig} does when
+     *                 {@code regionWithLowerCoordOnContig} is '-' and {@code regionWithHigherCoordOnContig} is '+'
+     *         </li>
+     *         <li>For events involving alignments to different chromosomes WITHOUT strand switch,
+     *              the two alignments are mapped to the '+' reference strand
+     *         </li>
+     *         <li>For events involving alignments to different chromosomes with strand switch,
+     *              {@code regionWithLowerCoordOnContig} is a mapping to a chromosome with lower index, according to
+     *              {@code referenceDictionary}
+     *         </li>
+     *     </ul>
+     * </p>
+     *
+     */
+    @VisibleForTesting
+    static boolean isForwardStrandRepresentation(final AlignmentInterval regionWithLowerCoordOnContig,
+                                                 final AlignmentInterval regionWithHigherCoordOnContig,
+                                                 final StrandSwitch strandSwitch,
+                                                 final SAMSequenceDictionary referenceDictionary) {
+
+        final boolean mappedToSameChr = regionWithLowerCoordOnContig.referenceSpan.getContig()
+                .equals(regionWithHigherCoordOnContig.referenceSpan.getContig());
+        if (mappedToSameChr) {
+            switch (strandSwitch) {
+                case NO_SWITCH: return regionWithLowerCoordOnContig.forwardStrand;
+                case FORWARD_TO_REVERSE: return regionWithLowerCoordOnContig.referenceSpan.getEnd() < regionWithHigherCoordOnContig.referenceSpan.getEnd();
+                case REVERSE_TO_FORWARD: return regionWithLowerCoordOnContig.referenceSpan.getStart() < regionWithHigherCoordOnContig.referenceSpan.getStart();
+                default: throw new IllegalArgumentException("Seeing unexpected strand switch case: " + strandSwitch.name());
+            }
+        } else {
+            if (strandSwitch == StrandSwitch.NO_SWITCH) {
+                return regionWithLowerCoordOnContig.forwardStrand;
+            } else {
+                return IntervalUtils.compareContigs(regionWithLowerCoordOnContig.referenceSpan,
+                        regionWithHigherCoordOnContig.referenceSpan, referenceDictionary)
+                        < 0;
+            }
+        }
+    }
+
+    @VisibleForTesting
+    static StrandSwitch determineStrandSwitch(final AlignmentInterval first, final AlignmentInterval second) {
+        if (first.forwardStrand == second.forwardStrand) {
+            return StrandSwitch.NO_SWITCH;
+        } else {
+            return first.forwardStrand ? StrandSwitch.FORWARD_TO_REVERSE : StrandSwitch.REVERSE_TO_FORWARD;
+        }
+    }
+
+    // =================================================================================================================
+
+    /**
+     * Roughly similar to {@link ChimericAlignment#nextAlignmentMayBeInsertion(AlignmentInterval, AlignmentInterval, Integer, Integer, boolean)}:
+     *  1) either alignment may have very low mapping quality (a more relaxed mapping quality threshold);
+     *  2) either alignment may consume only a "short" part of the contig, or if assuming that the alignment consumes
+     *     roughly the same amount of ref bases and read bases, has isAlignment that is too short
+     */
+    static boolean splitPairStrongEnoughEvidenceForCA(final AlignmentInterval intervalOne,
+                                                      final AlignmentInterval intervalTwo,
+                                                      final int mapQThresholdInclusive,
+                                                      final int alignmentLengthThresholdInclusive) {
+
+        if (intervalOne.mapQual < mapQThresholdInclusive || intervalTwo.mapQual < mapQThresholdInclusive)
+            return false;
+
+        final int overlap = AlignmentInterval.overlapOnContig(intervalOne, intervalTwo);
+
+        return Math.min(intervalOne.getSizeOnRead() - overlap, intervalTwo.getSizeOnRead() - overlap)
+                >= alignmentLengthThresholdInclusive;
+    }
+
+    /**
+     * @return a simple chimera indicated by the alignments of the input contig;
+     *         if the input chimeric alignments are not strong enough to support an CA, a {@code null} is returned
+     *
+     * @throws IllegalArgumentException if the input contig doesn't have exactly two good input alignments
+     */
+    static ChimericAlignment extractSimpleChimera(final AssemblyContigWithFineTunedAlignments contig,
+                                                  final SAMSequenceDictionary referenceDictionary) {
+        if ( ! contig.hasOnly2GoodAlignments() )
+            throw new IllegalArgumentException("assembly contig sent to the wrong path: assumption that contig has only 2 good alignments is violated for\n" +
+                    contig.toString());
+
+        final AlignmentInterval alignmentOne = contig.getSourceContig().alignmentIntervals.get(0);
+        final AlignmentInterval alignmentTwo = contig.getSourceContig().alignmentIntervals.get(1);
+
+        return new ChimericAlignment(alignmentOne, alignmentTwo, contig.getInsertionMappings(),
+                contig.getSourceContig().contigName, referenceDictionary);
+    }
+
     // =================================================================================================================
     //////////// BELOW ARE CODE PATH USED FOR INSERTION, DELETION, AND DUPLICATION (INV OR NOT) AND INVERSION, AND ARE TESTED ONLY FOR THAT PURPOSE
 
-    // TODO: 1/15/18 to be phased out by InsDelVariantDetector.convertAlignmentIntervalToChimericAlignment()
+    // TODO: 1/24/18 to be phased out by #extractSimpleChimera()
     /**
      * Parse all alignment records for a single locally-assembled contig and generate chimeric alignments if available.
      * Applies certain filters to skip the input alignment regions that are:
@@ -191,7 +310,6 @@ public class ChimericAlignment {
         return results;
     }
 
-    //==================================================================================================================
     // TODO: 11/22/16 it might also be suitable to consider the reference context this alignment region is mapped to
     //       and not simply apply a hard filter (need to think about how to test)
     private static boolean mapQualTooLow(final AlignmentInterval aln, final int mapQThresholdInclusive) {
@@ -221,197 +339,9 @@ public class ChimericAlignment {
                 (filterWhollyContained && (current.referenceSpan.contains(next.referenceSpan) || next.referenceSpan.contains(current.referenceSpan)));
     }
 
-    @VisibleForTesting
-    static StrandSwitch determineStrandSwitch(final AlignmentInterval first, final AlignmentInterval second) {
-        if (first.forwardStrand == second.forwardStrand) {
-            return StrandSwitch.NO_SWITCH;
-        } else {
-            return first.forwardStrand ? StrandSwitch.FORWARD_TO_REVERSE : StrandSwitch.REVERSE_TO_FORWARD;
-        }
-    }
-
-    /**
-     * An SV event could be detected from a contig that seem originate from the forward or reverse strand of the reference,
-     * besides the annotation that the alignment flanking regions might flank either side of the two breakpoints.
-     *
-     * <p> The definition for '+' representation is such that:
-     *     <ul>
-     *         <li>For events involving alignments to the same chromosome (with or without strand switch),
-     *              1) the two alignments are mapped to the '+' reference strand when there is NO strand switch
-     *              2) {@code regionWithLowerCoordOnContig} ends earlier on the reference than
-     *                 {@code regionWithHigherCoordOnContig} does when
-     *                 {@code regionWithLowerCoordOnContig} is '+' and {@code regionWithHigherCoordOnContig} is '-'
-     *              3) {@code regionWithLowerCoordOnContig} starts earlier on the reference than
-     *                 {@code regionWithHigherCoordOnContig} does when
-     *                 {@code regionWithLowerCoordOnContig} is '-' and {@code regionWithHigherCoordOnContig} is '+'
-     *         </li>
-     *         <li>For events involving alignments to different chromosomes WITHOUT strand switch,
-     *              the two alignments are mapped to the '+' reference strand
-     *         </li>
-     *         <li>For events involving alignments to different chromosomes with strand switch,
-     *              {@code regionWithLowerCoordOnContig} is a mapping to a chromosome with lower index, according to
-     *              {@code referenceDictionary}
-     *         </li>
-     *     </ul>
-     * </p>
-     *
-     */
-    @VisibleForTesting
-    static boolean isForwardStrandRepresentation(final AlignmentInterval regionWithLowerCoordOnContig,
-                                                 final AlignmentInterval regionWithHigherCoordOnContig,
-                                                 final StrandSwitch strandSwitch,
-                                                 final SAMSequenceDictionary referenceDictionary) {
-
-        final boolean mappedToSameChr = regionWithLowerCoordOnContig.referenceSpan.getContig()
-                                        .equals(regionWithHigherCoordOnContig.referenceSpan.getContig());
-        if (mappedToSameChr) {
-            switch (strandSwitch) {
-                case NO_SWITCH: return regionWithLowerCoordOnContig.forwardStrand;
-                case FORWARD_TO_REVERSE: return regionWithLowerCoordOnContig.referenceSpan.getEnd() < regionWithHigherCoordOnContig.referenceSpan.getEnd();
-                case REVERSE_TO_FORWARD: return regionWithLowerCoordOnContig.referenceSpan.getStart() < regionWithHigherCoordOnContig.referenceSpan.getStart();
-                default: throw new IllegalArgumentException("Seeing unexpected strand switch case: " + strandSwitch.name());
-            }
-        } else {
-            if (strandSwitch == StrandSwitch.NO_SWITCH) {
-                return regionWithLowerCoordOnContig.forwardStrand;
-            } else {
-                return IntervalUtils.compareContigs(regionWithLowerCoordOnContig.referenceSpan,
-                                                    regionWithHigherCoordOnContig.referenceSpan, referenceDictionary)
-                        < 0;
-            }
-        }
-    }
-
-    /**
-     * See {@link #isLikelySimpleTranslocation()} for logic.
-     */
-    @VisibleForTesting
-    static boolean isLikelySimpleTranslocation(final AlignmentInterval regionWithLowerCoordOnContig,
-                                               final AlignmentInterval regionWithHigherCoordOnContig,
-                                               final StrandSwitch strandSwitch) {
-
-        if (!regionWithLowerCoordOnContig.referenceSpan.getContig()
-                .equals(regionWithHigherCoordOnContig.referenceSpan.getContig()))
-            return true;
-
-        if ( !strandSwitch.equals(StrandSwitch.NO_SWITCH) )
-            return false;
-
-        final SimpleInterval referenceSpanOne = regionWithLowerCoordOnContig.referenceSpan,
-                             referenceSpanTwo = regionWithHigherCoordOnContig.referenceSpan;
-
-        if (referenceSpanOne.contains(referenceSpanTwo) || referenceSpanTwo.contains(referenceSpanOne))
-            return false;
-
-        if (regionWithLowerCoordOnContig.forwardStrand) {
-            return referenceSpanOne.getStart() > referenceSpanTwo.getEnd();
-        } else {
-            return referenceSpanTwo.getStart() > referenceSpanOne.getEnd();
-        }
-    }
-
-    /**
-     * Determine if the chimeric alignment indicates a simple translocation.
-     * Simple translocations are defined here and at this time as:
-     * <ul>
-     *  <li>inter-chromosomal translocations, i.e. novel adjacency between different reference chromosomes, or</li>
-     *  <li>intra-chromosomal translocation that DOES NOT involve a strand switch, i.e.
-     *      novel adjacency between reference locations on the same chromosome involving NO strand switch,
-     *      but in the meantime, the two inducing alignments CANNOT overlap each other since that would point to
-     *      incomplete picture, hence not "simple" anymore.
-     *  </li>
-     * </ul>
-     * A caveat is that this does not cover the case when the novel adjacency suggested by the CA is between
-     * two reference locations on the same chromosome, but involves a strand switch,
-     * which could be a translocation or inversion breakpoint.
-     * But to fully resolve this case, we need other types of evidence, hence should not be the task of this function.
-     */
-    public boolean isLikelySimpleTranslocation() {
-        return isLikelySimpleTranslocation(regionWithLowerCoordOnContig, regionWithHigherCoordOnContig, strandSwitch);
-    }
-
-    /**
-     * This predicate tests if an assembly contig has the full event (i.e. alt haplotype) assembled
-     * Of course, the grand problem of SV is always not getting the big-enough picture
-     * but here we have a more workable definition of what is definitely not big-enough:
-     *
-     * If the assembly contig, with its two (picked) alignments, shows any of the following signature,
-     * it is definitely not giving the whole picture of the alt haplotype,
-     * hence without other types of evidence (or linking breakpoints, which itself needs other evidence anyway),
-     * human-friendly interpretation for them is unreliable.
-     * <ul>
-     *     <li>
-     *         first and second alignment contain each other in terms of their reference span,
-     *         regardless if strand switch is involved;
-     *     </li>
-     *     <li>
-     *         todo: this obsoletes the actual use of {@link #isLikelyInvertedDuplication()} and related inverted duplication call code we have now, but those could be used to figure out how to annotate which known ref regions are invert duplicated
-     *         first and second alignment involve strand switch, but their reference span overlap;
-     *     </li>
-     *     <li>
-     *         first and second alignment have reference order switch but their reference span overlaps;
-     *     </li>
-     * </ul>
-     */
-    static boolean hasIncompletePictureFromTwoAlignments(final AlignmentInterval one, final AlignmentInterval two) {
-        final SimpleInterval referenceSpanOne = one.referenceSpan;
-        final SimpleInterval referenceSpanTwo = two.referenceSpan;
-
-        // inter contig mapping will not be treated as incomplete picture for 2-alignment reads
-        if ( ! referenceSpanOne.getContig().equals(referenceSpanTwo.getContig()) )
-            return false;
-
-        // ref span containment
-        if (referenceSpanOne.contains(referenceSpanTwo) || referenceSpanTwo.contains(referenceSpanOne))
-            return true;
-
-        // overlapping strand-switch
-        // TODO: 10/29/17 this obsoletes the inverted duplication call code we have now,
-        //      but those could be used to figure out how to annotate which known ref regions are invert duplicated
-        if (one.forwardStrand != two.forwardStrand &&
-                referenceSpanOne.overlaps(referenceSpanTwo))
-            return true;
-
-        // no strand switch but overlapping reference order switch
-        if (one.forwardStrand) {
-            return referenceSpanOne.getStart() > referenceSpanTwo.getStart() &&
-                    referenceSpanOne.getStart() <= referenceSpanTwo.getEnd();
-        } else {
-            return referenceSpanTwo.getStart() > referenceSpanOne.getStart() &&
-                    referenceSpanTwo.getStart() <= referenceSpanOne.getEnd();
-        }
-    }
-
-    boolean isNeitherSimpleTranslocationNorIncompletePicture() {
-        return !isLikelySimpleTranslocation()
-                &&
-                !hasIncompletePictureFromTwoAlignments(regionWithLowerCoordOnContig, regionWithHigherCoordOnContig);
-    }
-
-    /**
-     * See {@link #isLikelyInvertedDuplication()}
-     */
-    @VisibleForTesting
-    static boolean isLikelyInvertedDuplication(final AlignmentInterval one, final AlignmentInterval two) {
-        if (one.forwardStrand == two.forwardStrand)
-            return false;
-        return 2 * AlignmentInterval.overlapOnRefSpan(one, two) >
-                Math.min(one.endInAssembledContig - one.startInAssembledContig,
-                        two.endInAssembledContig - two.startInAssembledContig) + 1;
-    }
-
-    /**
-     * todo : see ticket #3529
-     * @return true iff the two AI of the {@code longRead} are
-     *         1) of different strand and
-     *         2) overlap on reference is more than half of the two AI's minimal read span.
-     */
-    public boolean isLikelyInvertedDuplication() {
-        return isLikelyInvertedDuplication(regionWithLowerCoordOnContig, regionWithHigherCoordOnContig);
-    }
-
     //==================================================================================================================
-    public String onErrStringRep() {
+    @Override
+    public String toString() {
         return sourceContigName +
                 "\t" +
                 regionWithLowerCoordOnContig.toPackedString() +
@@ -470,45 +400,6 @@ public class ChimericAlignment {
         result = 31 * result + (isForwardStrandRepresentation ? 1 : 0);
         result = 31 * result + insertionMappings.hashCode();
         return result;
-    }
-
-    /**
-     * Roughly similar to {@link ChimericAlignment#nextAlignmentMayBeInsertion(AlignmentInterval, AlignmentInterval, Integer, Integer, boolean)}:
-     *  1) either alignment may have very low mapping quality (a more relaxed mapping quality threshold);
-     *  2) either alignment may consume only a "short" part of the contig, or if assuming that the alignment consumes
-     *     roughly the same amount of ref bases and read bases, has isAlignment that is too short
-     */
-    static boolean splitPairStrongEnoughEvidenceForCA(final AlignmentInterval intervalOne,
-                                                      final AlignmentInterval intervalTwo,
-                                                      final int mapQThresholdInclusive,
-                                                      final int alignmentLengthThresholdInclusive) {
-
-        if (intervalOne.mapQual < mapQThresholdInclusive || intervalTwo.mapQual < mapQThresholdInclusive)
-            return false;
-
-        final int overlap = AlignmentInterval.overlapOnContig(intervalOne, intervalTwo);
-
-        return Math.min(intervalOne.getSizeOnRead() - overlap, intervalTwo.getSizeOnRead() - overlap)
-                >= alignmentLengthThresholdInclusive;
-    }
-
-    /**
-     * @return a simple chimera indicated by the alignments of the input contig;
-     *         if the input chimeric alignments are not strong enough to support an CA, a {@code null} is returned
-     *
-     * @throws IllegalArgumentException if the input contig doesn't have exactly two good input alignments
-     */
-    static ChimericAlignment extractSimpleChimera(final AssemblyContigWithFineTunedAlignments contig,
-                                                  final SAMSequenceDictionary referenceDictionary) {
-        if ( ! contig.hasOnly2GoodAlignments() )
-            throw new IllegalArgumentException("assembly contig sent to the wrong path: assumption that contig has only 2 good alignments is violated for\n" +
-                    contig.toString());
-
-        final AlignmentInterval alignmentOne = contig.getSourceContig().alignmentIntervals.get(0);
-        final AlignmentInterval alignmentTwo = contig.getSourceContig().alignmentIntervals.get(1);
-
-        return new ChimericAlignment(alignmentOne, alignmentTwo, contig.getInsertionMappings(),
-                contig.getSourceContig().contigName, referenceDictionary);
     }
 
     /**

@@ -1,11 +1,13 @@
 package org.broadinstitute.hellbender.tools.spark.sv.discovery.inference;
 
+import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.SAMSequenceDictionary;
 import org.apache.logging.log4j.Logger;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.broadcast.Broadcast;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.*;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.RDDUtils;
+import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
 import scala.Tuple2;
 
@@ -174,7 +176,115 @@ public final class AssemblyContigAlignmentSignatureClassifier {
         if (first.forwardStrand != last.forwardStrand)
             return false;
 
-        return ChimericAlignment.isLikelySimpleTranslocation(first, last, StrandSwitch.NO_SWITCH);
+        return isLikelySimpleTranslocation(first, last, StrandSwitch.NO_SWITCH);
+    }
+
+    /**
+     * Determine if the chimeric alignment indicates a simple translocation.
+     * Simple translocations are defined here and at this time as:
+     * <ul>
+     *  <li>inter-chromosomal translocations, i.e. novel adjacency between different reference chromosomes, or</li>
+     *  <li>intra-chromosomal translocation that DOES NOT involve a strand switch, i.e.
+     *      novel adjacency between reference locations on the same chromosome involving NO strand switch,
+     *      but in the meantime, the two inducing alignments CANNOT overlap each other since that would point to
+     *      incomplete picture, hence not "simple" anymore.
+     *  </li>
+     * </ul>
+     * A caveat is that this does not cover the case when the novel adjacency suggested by the CA is between
+     * two reference locations on the same chromosome, but involves a strand switch,
+     * which could be a translocation or inversion breakpoint.
+     * But to fully resolve this case, we need other types of evidence, hence should not be the task of this function.
+     */
+    @VisibleForTesting
+    static boolean isLikelySimpleTranslocation(final AlignmentInterval regionWithLowerCoordOnContig,
+                                               final AlignmentInterval regionWithHigherCoordOnContig,
+                                               final StrandSwitch strandSwitch) {
+
+        if (!regionWithLowerCoordOnContig.referenceSpan.getContig()
+                .equals(regionWithHigherCoordOnContig.referenceSpan.getContig()))
+            return true;
+
+        if ( !strandSwitch.equals(StrandSwitch.NO_SWITCH) )
+            return false;
+
+        final SimpleInterval referenceSpanOne = regionWithLowerCoordOnContig.referenceSpan,
+                referenceSpanTwo = regionWithHigherCoordOnContig.referenceSpan;
+
+        if (referenceSpanOne.contains(referenceSpanTwo) || referenceSpanTwo.contains(referenceSpanOne))
+            return false;
+
+        if (regionWithLowerCoordOnContig.forwardStrand) {
+            return referenceSpanOne.getStart() > referenceSpanTwo.getEnd();
+        } else {
+            return referenceSpanTwo.getStart() > referenceSpanOne.getEnd();
+        }
+    }
+
+    /**
+     * todo : see ticket #3529
+     * @return true iff the two AI of the {@code longRead} are
+     *         1) of different strand and
+     *         2) overlap on reference is more than half of the two AI's minimal read span.
+     */
+    @VisibleForTesting
+    static boolean isLikelyInvertedDuplication(final AlignmentInterval one, final AlignmentInterval two) {
+        if (one.forwardStrand == two.forwardStrand)
+            return false;
+        return 2 * AlignmentInterval.overlapOnRefSpan(one, two) >
+                Math.min(one.endInAssembledContig - one.startInAssembledContig,
+                        two.endInAssembledContig - two.startInAssembledContig) + 1;
+    }
+
+    /**
+     * This predicate tests if an assembly contig has the full event (i.e. alt haplotype) assembled
+     * Of course, the grand problem of SV is always not getting the big-enough picture
+     * but here we have a more workable definition of what is definitely not big-enough:
+     *
+     * If the assembly contig, with its two (picked) alignments, shows any of the following signature,
+     * it is definitely not giving the whole picture of the alt haplotype,
+     * hence without other types of evidence (or linking breakpoints, which itself needs other evidence anyway),
+     * human-friendly interpretation for them is unreliable.
+     * <ul>
+     *     <li>
+     *         first and second alignment contain each other in terms of their reference span,
+     *         regardless if strand switch is involved;
+     *     </li>
+     *     <li>
+     *         todo: this obsoletes the actual use of {@link #isLikelyInvertedDuplication()} and related inverted duplication call code we have now, but those could be used to figure out how to annotate which known ref regions are invert duplicated
+     *         first and second alignment involve strand switch, but their reference span overlap;
+     *     </li>
+     *     <li>
+     *         first and second alignment have reference order switch but their reference span overlaps;
+     *     </li>
+     * </ul>
+     */
+    static boolean hasIncompletePictureFromTwoAlignments(final AlignmentInterval one, final AlignmentInterval two) {
+        final SimpleInterval referenceSpanOne = one.referenceSpan;
+        final SimpleInterval referenceSpanTwo = two.referenceSpan;
+
+        // inter contig mapping will not be treated as incomplete picture for 2-alignment reads
+        if ( ! referenceSpanOne.getContig().equals(referenceSpanTwo.getContig()) )
+            return false;
+
+        // ref span containment
+        if (referenceSpanOne.contains(referenceSpanTwo) || referenceSpanTwo.contains(referenceSpanOne))
+            return true;
+
+        // overlapping strand-switch
+        // TODO: 10/29/17 this obsoletes the inverted duplication call code we have now,
+        //      but those could be used to figure out how to annotate which known ref regions are invert duplicated
+        if (one.forwardStrand != two.forwardStrand &&
+                referenceSpanOne.overlaps(referenceSpanTwo))
+            return true;
+
+        // no strand switch but overlapping reference order switch
+        if (one.forwardStrand) {
+            return referenceSpanOne.getStart() > referenceSpanTwo.getStart() &&
+                    referenceSpanOne.getStart() <= referenceSpanTwo.getEnd();
+        } else {
+            return referenceSpanTwo.getStart() > referenceSpanOne.getStart() &&
+                    referenceSpanTwo.getStart() <= referenceSpanOne.getEnd();
+        }
     }
 
     //==================================================================================================================

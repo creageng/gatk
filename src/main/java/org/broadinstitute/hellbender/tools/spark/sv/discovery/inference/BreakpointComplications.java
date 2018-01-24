@@ -342,12 +342,12 @@ public final class BreakpointComplications {
             // the reference system with a shorter overlap (i.e. with less-negative distance between regions) has a higher repeat number
             resolveComplicationForComplexTandup(firstContigRegion, secondContigRegion, r1e, distBetweenAlignRegionsOnRef, distBetweenAlignRegionsOnCtg, contigSeq);
         } else if (distBetweenAlignRegionsOnRef == 0 && distBetweenAlignRegionsOnCtg == 0) {// SNP & indel
-            throw new GATKException("Detected badly parsed chimeric alignment for identifying SV breakpoints; no rearrangement found: " + chimericAlignment.onErrStringRep());
+            throw new GATKException("Detected badly parsed chimeric alignment for identifying SV breakpoints; no rearrangement found: " + chimericAlignment.toString());
         }
 
         if ( insertedSequenceForwardStrandRep.isEmpty() ){
             if ( dupSeqRepeatNumOnCtg != dupSeqRepeatNumOnRef && null == dupSeqRepeatUnitRefSpan )
-                throw new GATKException("An identified breakpoint pair seem to suggest insertion but the inserted sequence is empty: " + chimericAlignment.onErrStringRep());
+                throw new GATKException("An identified breakpoint pair seem to suggest insertion but the inserted sequence is empty: " + chimericAlignment.toString());
         }
     }
 

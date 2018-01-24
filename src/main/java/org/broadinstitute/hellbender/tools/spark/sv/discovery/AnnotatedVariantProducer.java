@@ -259,7 +259,7 @@ public class AnnotatedVariantProducer implements Serializable {
      * Utility structs for extraction information from the consensus NovelAdjacencyReferenceLocations out of multiple ChimericAlignments,
      * to be later added to annotations of the VariantContext extracted.
      */
-    private static final class NovelAdjacencyEvidenceAnnotations implements Serializable {
+    private static final class ChimericContigAlignmentEvidenceAnnotations implements Serializable {
         private static final long serialVersionUID = 1L;
 
         final Integer minMQ;
@@ -267,7 +267,7 @@ public class AnnotatedVariantProducer implements Serializable {
         final String sourceContigName;
         final List<String> insSeqMappings;
 
-        NovelAdjacencyEvidenceAnnotations(final ChimericAlignment chimericAlignment){
+        ChimericContigAlignmentEvidenceAnnotations(final ChimericAlignment chimericAlignment){
             minMQ = Math.min(chimericAlignment.regionWithLowerCoordOnContig.mapQual,
                              chimericAlignment.regionWithHigherCoordOnContig.mapQual);
             minAL = Math.min(chimericAlignment.regionWithLowerCoordOnContig.referenceSpan.size(),
@@ -282,10 +282,10 @@ public class AnnotatedVariantProducer implements Serializable {
     @VisibleForTesting
     static Map<String, Object> getEvidenceRelatedAnnotations(final Iterable<ChimericAlignment> splitAlignmentEvidence) {
 
-        final List<NovelAdjacencyEvidenceAnnotations> annotations =
+        final List<ChimericContigAlignmentEvidenceAnnotations> annotations =
                 Utils.stream(splitAlignmentEvidence)
                         .sorted(Comparator.comparing(ca -> ca.sourceContigName))
-                        .map(NovelAdjacencyEvidenceAnnotations::new).collect(Collectors.toList());
+                        .map(ChimericContigAlignmentEvidenceAnnotations::new).collect(Collectors.toList());
 
         final Map<String, Object> attributeMap = new HashMap<>();
         attributeMap.put(GATKSVVCFConstants.TOTAL_MAPPINGS,    annotations.size());
