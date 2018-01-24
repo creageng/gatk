@@ -3,7 +3,6 @@ package org.broadinstitute.hellbender.tools.spark.sv.discovery.inference;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import htsjdk.samtools.SAMSequenceDictionary;
-import htsjdk.variant.variantcontext.VariantContext;
 import org.apache.logging.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -15,7 +14,6 @@ import org.broadinstitute.hellbender.tools.spark.sv.discovery.*;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AssemblyContigWithFineTunedAlignments;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.StrandSwitch;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVInterval;
-import org.broadinstitute.hellbender.tools.spark.sv.utils.SVIntervalTree;
 import org.broadinstitute.hellbender.utils.Utils;
 import scala.Tuple2;
 import scala.Tuple3;
@@ -192,7 +190,7 @@ public final class SimpleNovelAdjacencyInterpreter {
                 Utils.stream(chimeraAndContigSeq)
                         .collect(
                                 Collectors.groupingBy(caAndSeq ->
-                                                novelAdjacency.complication.extractAltHaplotypeForInvDup(caAndSeq._1, caAndSeq._2),
+                                                caAndSeq._1.extractAltHaplotypeForInvDup(caAndSeq._2),
                                         Collectors.mapping(caAndSeq -> caAndSeq._1, Collectors.toList())
                                 )
                         )

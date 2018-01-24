@@ -6,10 +6,12 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.SAMSequenceDictionary;
+import htsjdk.samtools.util.SequenceUtil;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AlignedContig;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AlignmentInterval;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AssemblyContigWithFineTunedAlignments;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.StrandSwitch;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.SvCigarUtils;
 import org.broadinstitute.hellbender.utils.IntervalUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 
@@ -507,5 +509,65 @@ public class ChimericAlignment {
 
         return new ChimericAlignment(alignmentOne, alignmentTwo, contig.getInsertionMappings(),
                 contig.getSourceContig().contigName, referenceDictionary);
+    }
+
+    /**
+     * Extract alt haplotype sequence, based on the input {@code chimericAlignment} and {@code contigSeq}.
+     * @param contigSeq
+     */
+    byte[] extractAltHaplotypeForInvDup(final byte[] contigSeq) {
+
+        final int start, end; // intended to be 0-based, semi-open [start, end)
+        final boolean needRC;
+        // below we need to use cigars of the provided alignments to compute how long we need to walk on the read
+        // so that we can "start" to or "end" to collect bases for alternative haplotype sequence,
+        // because one could imagine either alignment has long flanking region that is far from the affected reference region.
+        if (regionWithLowerCoordOnContig.forwardStrand) {
+            final int alpha = regionWithLowerCoordOnContig.referenceSpan.getStart(),
+                    omega = regionWithHigherCoordOnContig.referenceSpan.getStart();
+            if (alpha <= omega) {
+                final int walkOnReadUntilDuplicatedSequence ;
+                if (alpha == omega) {
+                    walkOnReadUntilDuplicatedSequence = 0;
+                } else {
+                    walkOnReadUntilDuplicatedSequence = SvCigarUtils.computeAssociatedDistOnRead(regionWithLowerCoordOnContig.cigarAlong5to3DirectionOfContig,
+                            regionWithLowerCoordOnContig.startInAssembledContig, omega - alpha, false);
+                }
+                start = regionWithLowerCoordOnContig.startInAssembledContig + walkOnReadUntilDuplicatedSequence - 1;
+                end = regionWithHigherCoordOnContig.endInAssembledContig;
+                needRC = false;
+            } else {
+                final int walkOnReadUntilDuplicatedSequence = SvCigarUtils.computeAssociatedDistOnRead(regionWithHigherCoordOnContig.cigarAlong5to3DirectionOfContig,
+                        regionWithHigherCoordOnContig.endInAssembledContig, alpha - omega, true);
+                start = regionWithLowerCoordOnContig.startInAssembledContig - 1;
+                end = regionWithHigherCoordOnContig.endInAssembledContig - walkOnReadUntilDuplicatedSequence;
+                needRC = true;
+            }
+        } else {
+            final int alpha = regionWithLowerCoordOnContig.referenceSpan.getEnd(),
+                    omega = regionWithHigherCoordOnContig.referenceSpan.getEnd();
+            if (alpha >= omega) {
+                final int walkOnReadUntilDuplicatedSequence ;
+                if (alpha == omega) {
+                    walkOnReadUntilDuplicatedSequence = 0;
+                } else {
+                    walkOnReadUntilDuplicatedSequence = SvCigarUtils.computeAssociatedDistOnRead(regionWithLowerCoordOnContig.cigarAlong5to3DirectionOfContig,
+                            regionWithLowerCoordOnContig.startInAssembledContig, alpha - omega, false);
+                }
+                start = regionWithLowerCoordOnContig.startInAssembledContig + walkOnReadUntilDuplicatedSequence - 1;
+                end = regionWithHigherCoordOnContig.endInAssembledContig;
+                needRC = true;
+            } else {
+                final int walkOnReadUntilDuplicatedSequence = SvCigarUtils.computeAssociatedDistOnRead(regionWithHigherCoordOnContig.cigarAlong5to3DirectionOfContig,
+                        regionWithHigherCoordOnContig.endInAssembledContig, omega - alpha, true);
+                start = regionWithLowerCoordOnContig.startInAssembledContig - 1;
+                end = regionWithHigherCoordOnContig.endInAssembledContig - walkOnReadUntilDuplicatedSequence;
+                needRC = false;
+            }
+        }
+
+        final byte[] seq = Arrays.copyOfRange(contigSeq, start, end);
+        if (needRC) SequenceUtil.reverseComplement(seq, 0, seq.length);
+        return seq;
     }
 }

@@ -18,7 +18,6 @@ import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.StrandSw
 import org.broadinstitute.hellbender.tools.spark.sv.utils.GATKSVVCFConstants;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVUtils;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.Strand;
-import org.broadinstitute.hellbender.tools.spark.sv.utils.SvCigarUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.read.CigarUtils;
 
@@ -288,68 +287,6 @@ public final class BreakpointComplications {
         cigarStringsForDupSeqOnCtg = DEFAULT_CIGAR_STRINGS_FOR_DUP_SEQ_ON_CTG; // not computing cigars because alt haplotypes will be extracted
 
         dupAnnotIsFromOptimization = false;
-    }
-
-    /**
-     * Extract alt haplotype sequence, based on the input {@code chimericAlignment} and {@code contigSeq}.
-     */
-    public byte[] extractAltHaplotypeForInvDup(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
-
-        final AlignmentInterval firstAlignmentInterval  = chimericAlignment.regionWithLowerCoordOnContig;
-        final AlignmentInterval secondAlignmentInterval = chimericAlignment.regionWithHigherCoordOnContig;
-
-        final int start, end; // intended to be 0-based, semi-open [start, end)
-        final boolean needRC;
-        // below we need to use cigars of the provided alignments to compute how long we need to walk on the read
-        // so that we can "start" to or "end" to collect bases for alternative haplotype sequence,
-        // because one could imagine either alignment has long flanking region that is far from the affected reference region.
-        if (firstAlignmentInterval.forwardStrand) {
-            final int alpha = firstAlignmentInterval.referenceSpan.getStart(),
-                      omega = secondAlignmentInterval.referenceSpan.getStart();
-            if (alpha <= omega) {
-                final int walkOnReadUntilDuplicatedSequence ;
-                if (alpha == omega) {
-                    walkOnReadUntilDuplicatedSequence = 0;
-                } else {
-                    walkOnReadUntilDuplicatedSequence = SvCigarUtils.computeAssociatedDistOnRead(firstAlignmentInterval.cigarAlong5to3DirectionOfContig,
-                            firstAlignmentInterval.startInAssembledContig, omega - alpha, false);
-                }
-                start = firstAlignmentInterval.startInAssembledContig + walkOnReadUntilDuplicatedSequence - 1;
-                end = secondAlignmentInterval.endInAssembledContig;
-                needRC = false;
-            } else {
-                final int walkOnReadUntilDuplicatedSequence = SvCigarUtils.computeAssociatedDistOnRead(secondAlignmentInterval.cigarAlong5to3DirectionOfContig,
-                            secondAlignmentInterval.endInAssembledContig, alpha - omega, true);
-                start = firstAlignmentInterval.startInAssembledContig - 1;
-                end = secondAlignmentInterval.endInAssembledContig - walkOnReadUntilDuplicatedSequence;
-                needRC = true;
-            }
-        } else {
-            final int alpha = firstAlignmentInterval.referenceSpan.getEnd(),
-                      omega = secondAlignmentInterval.referenceSpan.getEnd();
-            if (alpha >= omega) {
-                final int walkOnReadUntilDuplicatedSequence ;
-                if (alpha == omega) {
-                    walkOnReadUntilDuplicatedSequence = 0;
-                } else {
-                    walkOnReadUntilDuplicatedSequence = SvCigarUtils.computeAssociatedDistOnRead(firstAlignmentInterval.cigarAlong5to3DirectionOfContig,
-                            firstAlignmentInterval.startInAssembledContig, alpha - omega, false);
-                }
-                start = firstAlignmentInterval.startInAssembledContig + walkOnReadUntilDuplicatedSequence - 1;
-                end = secondAlignmentInterval.endInAssembledContig;
-                needRC = true;
-            } else {
-                final int walkOnReadUntilDuplicatedSequence = SvCigarUtils.computeAssociatedDistOnRead(secondAlignmentInterval.cigarAlong5to3DirectionOfContig,
-                            secondAlignmentInterval.endInAssembledContig, omega - alpha, true);
-                start = firstAlignmentInterval.startInAssembledContig - 1;
-                end = secondAlignmentInterval.endInAssembledContig - walkOnReadUntilDuplicatedSequence;
-                needRC = false;
-            }
-        }
-
-        final byte[] seq = Arrays.copyOfRange(contigSeq, start, end);
-        if (needRC) SequenceUtil.reverseComplement(seq, 0, seq.length);
-        return seq;
     }
 
     //==================================================================================================================
