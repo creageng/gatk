@@ -48,7 +48,7 @@ public class NovelAdjacencyReferenceLocations {
             leftJustifiedRightRefLoc = leftJustifiedBreakpoints._2();
         } catch (final IllegalArgumentException iaex) { // catching IAEX specifically because it is the most likely exception thrown if there's bug, this helps quickly debugging what the problem is
             throw new GATKException("Erred when inferring breakpoint location and event type from chimeric alignment:\n" +
-                    chimericAlignment.onErrStringRep(), iaex);
+                    chimericAlignment.toString(), iaex);
         }
     }
 
@@ -236,7 +236,7 @@ public class NovelAdjacencyReferenceLocations {
                             upstreamBreakpointRefPos = ca.regionWithLowerCoordOnContig.referenceSpan.getStart();
                             downstreamBreakpointRefPos = ca.regionWithHigherCoordOnContig.referenceSpan.getStart() + homologyLen;
                             break;
-                        default: throw new GATKException("Unseen strand switch case for: " + ca.onErrStringRep());
+                        default: throw new GATKException("Unseen strand switch case for: " + ca.toString());
                     }
                 } else {
                     switch (ca.strandSwitch) {
@@ -257,7 +257,7 @@ public class NovelAdjacencyReferenceLocations {
                             upstreamBreakpointRefPos = ca.regionWithHigherCoordOnContig.referenceSpan.getStart();
                             downstreamBreakpointRefPos = ca.regionWithLowerCoordOnContig.referenceSpan.getStart() + homologyLen;
                             break;
-                        default: throw new GATKException("Unseen strand switch case for: " + ca.onErrStringRep());
+                        default: throw new GATKException("Unseen strand switch case for: " + ca.toString());
                     }
                 }
             }
@@ -280,7 +280,7 @@ public class NovelAdjacencyReferenceLocations {
                     case FORWARD_TO_REVERSE: case REVERSE_TO_FORWARD:
                         return ca.isForwardStrandRepresentation;
                     default:
-                        throw new GATKException("Unseen strand switch case for: " + ca.onErrStringRep());
+                        throw new GATKException("Unseen strand switch case for: " + ca.toString());
                 }
             }
         }
@@ -312,16 +312,16 @@ public class NovelAdjacencyReferenceLocations {
         Utils.validate(IntervalUtils.isBefore(leftBreakpoint, rightBreakpoint, referenceSequenceDictionary) ||
                         leftBreakpoint.equals(rightBreakpoint),
                 "Inferred novel adjacency reference locations have left location after right location : left " +
-                        leftBreakpoint + "\tright " + rightBreakpoint + "\t"  + ca.onErrStringRep() + "\n" + complication.toString());
+                        leftBreakpoint + "\tright " + rightBreakpoint + "\t"  + ca.toString() + "\n" + complication.toString());
 
         Utils.validate(leftBreakpoint.getEnd() <= referenceSequenceDictionary.getSequence(leftBreakpoint.getContig()).getSequenceLength(),
                 "Inferred breakpoint beyond reference sequence length: inferred location: " + leftBreakpoint +
                         "\tref contig length: " + referenceSequenceDictionary.getSequence(leftBreakpoint.getContig()).getSequenceLength() + "\n"
-                        + ca.onErrStringRep() + "\n" + complication.toString());
+                        + ca.toString() + "\n" + complication.toString());
         Utils.validate(rightBreakpoint.getEnd() <= referenceSequenceDictionary.getSequence(rightBreakpoint.getContig()).getSequenceLength(),
                 "Inferred breakpoint beyond reference sequence length: inferred location: " + rightBreakpoint +
                         "\tref contig length: " + referenceSequenceDictionary.getSequence(rightBreakpoint.getContig()).getSequenceLength() + "\n"
-                        + ca.onErrStringRep() + "\n" + complication.toString());
+                        + ca.toString() + "\n" + complication.toString());
     }
 
     @VisibleForTesting
