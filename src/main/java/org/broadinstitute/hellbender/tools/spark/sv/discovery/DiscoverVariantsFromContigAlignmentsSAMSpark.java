@@ -22,7 +22,7 @@ import org.broadinstitute.hellbender.engine.spark.GATKSparkTool;
 import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscoveryPipelineSpark;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AlignedContig;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.ChimericAlignment;
-import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.NovelAdjacencyReferenceLocations;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.NovelAdjacencyAndInferredAltHaptype;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.SimpleNovelAdjacencyInterpreter;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVInterval;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVIntervalTree;
@@ -163,15 +163,15 @@ public final class DiscoverVariantsFromContigAlignmentsSAMSpark extends GATKSpar
         final String sampleId = svDiscoveryInputData.sampleId;
         final Logger toolLogger = svDiscoveryInputData.toolLogger;
 
-        final JavaPairRDD<NovelAdjacencyReferenceLocations, Iterable<ChimericAlignment>> narlsAndSources =
+        final JavaPairRDD<NovelAdjacencyAndInferredAltHaptype, Iterable<ChimericAlignment>> narlsAndSources =
                 contigSeqAndChimeras
                         .flatMapToPair(tigSeqAndChimeras -> {
                             final byte[] contigSeq = tigSeqAndChimeras._1;
                             final List<ChimericAlignment> chimericAlignments = tigSeqAndChimeras._2;
-                            final Stream<Tuple2<NovelAdjacencyReferenceLocations, ChimericAlignment>> novelAdjacencyAndSourceChimera =
+                            final Stream<Tuple2<NovelAdjacencyAndInferredAltHaptype, ChimericAlignment>> novelAdjacencyAndSourceChimera =
                                     chimericAlignments.stream()
                                             .map(ca -> new Tuple2<>(
-                                                    new NovelAdjacencyReferenceLocations(ca, contigSeq,
+                                                    new NovelAdjacencyAndInferredAltHaptype(ca, contigSeq,
                                                             referenceSequenceDictionaryBroadcast.getValue()), ca));
                             return novelAdjacencyAndSourceChimera.iterator();
                         })
@@ -189,7 +189,7 @@ public final class DiscoverVariantsFromContigAlignmentsSAMSpark extends GATKSpar
                                     new Tuple2<>(SimpleNovelAdjacencyInterpreter.inferSimpleTypeFromNovelAdjacency(noveltyAndEvidence._1), noveltyAndEvidence._2)))       // type inference based on novel adjacency and evidence alignments
                             .map(noveltyTypeAndEvidence ->
                             {
-                                final NovelAdjacencyReferenceLocations novelAdjacency = noveltyTypeAndEvidence._1;
+                                final NovelAdjacencyAndInferredAltHaptype novelAdjacency = noveltyTypeAndEvidence._1;
                                 final SimpleSVType inferredSimpleType = noveltyTypeAndEvidence._2._1;
                                 final Iterable<ChimericAlignment> evidence = noveltyTypeAndEvidence._2._2;
                                 return AnnotatedVariantProducer

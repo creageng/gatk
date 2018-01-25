@@ -3,7 +3,7 @@ package org.broadinstitute.hellbender.tools.spark.sv.discovery;
 import htsjdk.samtools.SAMSequenceDictionary;
 import org.apache.logging.log4j.Logger;
 import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscoveryArgumentCollection.DiscoverVariantsFromContigsAlignmentsSparkArgumentCollection;
-import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.NovelAdjacencyReferenceLocations;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.NovelAdjacencyAndInferredAltHaptype;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVInterval;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVIntervalTree;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVVCFReader;
@@ -16,7 +16,7 @@ public class SvDiscoveryUtils {
     //==================================================================================================================
 
     public static void evaluateIntervalsAndNarls(final List<SVInterval> assembledIntervals,
-                                                 final List<NovelAdjacencyReferenceLocations> narls,
+                                                 final List<NovelAdjacencyAndInferredAltHaptype> narls,
                                                  final SAMSequenceDictionary referenceSequenceDictionary,
                                                  final DiscoverVariantsFromContigsAlignmentsSparkArgumentCollection parameters,
                                                  final Logger toolLogger) {
@@ -35,11 +35,11 @@ public class SvDiscoveryUtils {
         }
     }
 
-    private static SVIntervalTree<String> readBreakpointsFromNarls(final List<NovelAdjacencyReferenceLocations> narls,
+    private static SVIntervalTree<String> readBreakpointsFromNarls(final List<NovelAdjacencyAndInferredAltHaptype> narls,
                                                                    final SAMSequenceDictionary dictionary,
                                                                    final int breakpointPadding) {
         final SVIntervalTree<String> breakpoints = new SVIntervalTree<>();
-        for ( final NovelAdjacencyReferenceLocations narl : narls ) {
+        for ( final NovelAdjacencyAndInferredAltHaptype narl : narls ) {
             final int padding = breakpointPadding + narl.complication.getLength();
 
             final SimpleInterval si1 = narl.leftJustifiedLeftRefLoc;

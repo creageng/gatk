@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 
 /**
  * A helper struct for annotating complications that make the locations represented by its associated
- * {@link NovelAdjacencyReferenceLocations} a little ambiguous,
+ * {@link NovelAdjacencyAndInferredAltHaptype} a little ambiguous,
  * so that downstream analysis could infer sv type with these complications.
  * To be updated as more types of complications can be processed and handled by
  * {@link BreakpointComplications( ChimericAlignment )}.

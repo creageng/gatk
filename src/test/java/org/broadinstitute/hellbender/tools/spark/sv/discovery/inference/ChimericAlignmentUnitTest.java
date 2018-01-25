@@ -58,7 +58,7 @@ public class ChimericAlignmentUnitTest extends GATKBaseTest {
         final List<Tuple3<AlignmentInterval, AlignmentInterval, SAMSequenceDictionary>> result = new ArrayList<>(20);
 
         // simple inversion
-        Tuple4<AlignmentInterval, AlignmentInterval, NovelAdjacencyReferenceLocations, String> testData = forSimpleInversionFromLongCtg1WithStrangeLeftBreakpoint;
+        Tuple4<AlignmentInterval, AlignmentInterval, NovelAdjacencyAndInferredAltHaptype, String> testData = forSimpleInversionFromLongCtg1WithStrangeLeftBreakpoint;
         result.add(new Tuple3<>(testData._1(), testData._2(), SVDiscoveryTestDataProvider.seqDict));
 
         testData = forSimpleInversionWithHom_leftPlus;

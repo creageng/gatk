@@ -251,15 +251,15 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
                         // future implementation may integrate other types of evidence and re-interpret if necessary
                         .flatMap(pair -> {
                             final List<SvType> svTypes = pair._2;
-                            final SimpleNovelAdjacency simpleNovelAdjacency = pair._1;
+                            final SimpleNovelAdjacencyAndChimericAlignmentEvidence simpleNovelAdjacencyAndChimericAlignmentEvidence = pair._1;
                             if (svTypes.size() == 1) { // simple SV type
                                 final SvType inferredType = svTypes.get(0);
-                                final NovelAdjacencyReferenceLocations narl = simpleNovelAdjacency.getNovelAdjacencyReferenceLocations();
+                                final NovelAdjacencyAndInferredAltHaptype narl = simpleNovelAdjacencyAndChimericAlignmentEvidence.getNovelAdjacencyReferenceLocations();
                                 final SimpleInterval variantPos = narl.leftJustifiedLeftRefLoc;
                                 final int end = narl.leftJustifiedRightRefLoc.getEnd();
                                 final VariantContext variantContext = AnnotatedVariantProducer
                                         .produceAnnotatedVcFromInferredTypeAndRefLocations(variantPos, end, narl.complication,
-                                                inferredType, simpleNovelAdjacency.getAltHaplotypeSequence(), simpleNovelAdjacency.getAlignmentEvidence(),
+                                                inferredType, simpleNovelAdjacencyAndChimericAlignmentEvidence.getAltHaplotypeSequence(), simpleNovelAdjacencyAndChimericAlignmentEvidence.getAlignmentEvidence(),
                                                 referenceBroadcast, referenceSequenceDictionaryBroadcast, cnvCallsBroadcast, sampleId);
                                 return Collections.singletonList(variantContext).iterator();
                             } else { // BND mate pair
@@ -269,9 +269,9 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
                                 final Tuple2<BreakEndVariantType, BreakEndVariantType> bndMates = new Tuple2<>(firstMate, secondMate);
                                 final List<VariantContext> variantContexts = AnnotatedVariantProducer
                                         .produceAnnotatedBNDmatesVcFromNovelAdjacency(
-                                                simpleNovelAdjacency.getNovelAdjacencyReferenceLocations(),
+                                                simpleNovelAdjacencyAndChimericAlignmentEvidence.getNovelAdjacencyReferenceLocations(),
                                                 bndMates,
-                                                simpleNovelAdjacency.getAlignmentEvidence(),
+                                                simpleNovelAdjacencyAndChimericAlignmentEvidence.getAlignmentEvidence(),
                                                 referenceBroadcast, referenceSequenceDictionaryBroadcast, sampleId);
                                 return variantContexts.iterator();
                             }
