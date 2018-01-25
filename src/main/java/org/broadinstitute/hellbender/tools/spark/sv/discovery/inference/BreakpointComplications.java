@@ -13,50 +13,161 @@ import htsjdk.samtools.util.SequenceUtil;
 import htsjdk.variant.vcf.VCFConstants;
 import org.apache.commons.lang3.StringUtils;
 import org.broadinstitute.hellbender.exceptions.GATKException;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.SimpleSVType;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AlignmentInterval;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.StrandSwitch;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.GATKSVVCFConstants;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVUtils;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.Strand;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
+import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.read.CigarUtils;
+import scala.Tuple2;
+import scala.Tuple3;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * A helper struct for annotating complications that make the locations represented by its associated
- * {@link NovelAdjacencyAndInferredAltHaptype} a little ambiguous,
- * so that downstream analysis could infer sv type with these complications.
- * To be updated as more types of complications can be processed and handled by
- * {@link BreakpointComplications( ChimericAlignment )}.
+ * {@link NovelAdjacencyAndInferredAltHaptype} a little ambiguous.
+ *
+ * We currently handel five types for simple chimera induced precise variants:
+ * <ul>
+ *     <li>
+ *         deletions
+ *     </li>
+ *     <li>
+ *         small insertions
+ *     </li>
+ *     <Li>
+ *         replacements (i.e. del and ins at the same location)
+ *     </Li>
+ *     <li>
+ *         BND type, which in turn is turned into several subtypes
+ *         <ul>
+ *             <li>
+ *                 intra-chromosome strand-switch BND's, i.e. inversion breakpoint suspects
+ *             </li>
+ *             <li>
+ *                 intra-chromosome no strand-switch but order swap BND's, i.e. large tandem duplication breakpoint suspects
+ *             </li>
+ *             <li>
+ *                 inter-chromosome BND's, with or without strand switch.
+ *             </li>
+ *         </ul>
+ *     </li>
+ * </ul>
  */
 @DefaultSerializer(BreakpointComplications.Serializer.class)
-public final class BreakpointComplications {
+public class BreakpointComplications {
 
-    private static final List<String> DEFAULT_CIGAR_STRINGS_FOR_DUP_SEQ_ON_CTG = Collections.emptyList();
+    static final class DeletionBreakpointComplications extends BreakpointComplications {
+        DeletionBreakpointComplications(final ChimericAlignment simpleChimera, final byte[] contigSeq) {
+            initForInsDel(simpleChimera, contigSeq);
+        }
+    }
 
-    private static final List<Strand> DEFAULT_INV_DUP_REF_ORIENTATION = Collections.singletonList(Strand.POSITIVE);
-    private static final List<Strand> DEFAULT_INV_DUP_CTG_ORIENTATIONS_FR = Arrays.asList(Strand.POSITIVE, Strand.NEGATIVE);
-    private static final List<Strand> DEFAULT_INV_DUP_CTG_ORIENTATIONS_RF = Arrays.asList(Strand.NEGATIVE, Strand.POSITIVE);
+    static final class InsertionBreakpointComplications extends BreakpointComplications {
+        InsertionBreakpointComplications(final ChimericAlignment simpleChimera, final byte[] contigSeq) {
+            initForInsDel(simpleChimera, contigSeq);
+        }
+    }
+
+    /**
+     * For case where a contiguous array of bases of reference is replaced by anther array of bases
+     */
+    static final class ReplacementBreakpointComplications extends BreakpointComplications {
+        ReplacementBreakpointComplications(final ChimericAlignment simpleChimera, final byte[] contigSeq) {
+            initForInsDel(simpleChimera, contigSeq);
+        }
+    }
+
+    static final class SmallDuplicationBreakpointComplications extends BreakpointComplications {
+        SmallDuplicationBreakpointComplications(final ChimericAlignment simpleChimera, final byte[] contigSeq) {
+            initForInsDel(simpleChimera, contigSeq);
+        }
+    }
+
+    abstract static class BNDTypeBreakpointComplications extends BreakpointComplications {
+    }
+
+    /**
+     * For novel adjacency between reference locations that are on the same chromosome, and with a strand switch
+     */
+    static final class IntraChrStrandSwitchBreakpointComplications extends BNDTypeBreakpointComplications {
+        IntraChrStrandSwitchBreakpointComplications(final ChimericAlignment simpleChimera, final byte[] contigSeq) {
+            initForInvDup(simpleChimera, contigSeq);
+            initForInversion(simpleChimera, contigSeq);
+        }
+
+        // TODO: 1/26/18 differ between simple strand switch and inverted duplication suspect
+        // TODO: 1/21/18 hookup at the right place (right now no variants are using this any way because inverted duplication contigs are filtered out)
+        static Iterator<Tuple2<Tuple3<NovelAdjacencyAndInferredAltHaptype, SimpleSVType.DuplicationInverted, byte[]>, List<ChimericAlignment>>>
+        inferInvDupRange(final Tuple2<NovelAdjacencyAndInferredAltHaptype, Iterable<Tuple2<ChimericAlignment, byte[]>>> noveltyAndEvidence) {
+
+            final NovelAdjacencyAndInferredAltHaptype novelAdjacency = noveltyAndEvidence._1;
+            final SimpleSVType.DuplicationInverted duplicationInverted = new SimpleSVType.DuplicationInverted(novelAdjacency);
+
+            // doing this because the same novel adjacency reference locations might be induced by different (probably only slightly) alt haplotypes, so a single group by NARL is not enough
+            final Iterable<Tuple2<ChimericAlignment, byte[]>> chimeraAndContigSeq = noveltyAndEvidence._2;
+            final Set<Map.Entry<byte[], List<ChimericAlignment>>> alignmentEvidenceGroupedByAltHaplotypeSequence =
+                    Utils.stream(chimeraAndContigSeq)
+                            .collect(
+                                    Collectors.groupingBy(caAndSeq -> new byte[0],
+                                            Collectors.mapping(caAndSeq -> caAndSeq._1, Collectors.toList())
+                                    )
+                            )
+                            .entrySet();
+
+            return alignmentEvidenceGroupedByAltHaplotypeSequence.stream()
+                    .map(entry -> new Tuple2<>(new Tuple3<>(novelAdjacency, duplicationInverted, entry.getKey()),
+                            entry.getValue()))
+                    .iterator();
+        }
+    }
+
+    /**
+     * For novel adjacency between reference locations that are on the same chromosome, WITHOUT strand switch
+     * but with order swap, i.e. a base with higher coordinate on ref has lower coordinate on sample.
+     */
+    static final class IntraChrRefOrderSwapBreakpointComplications extends BNDTypeBreakpointComplications {
+        IntraChrRefOrderSwapBreakpointComplications(final ChimericAlignment simpleChimera, final byte[] contigSeq) {
+            initForSuspectedTranslocation(simpleChimera, contigSeq);
+        }
+    }
+
+    static final class InterChromosomeBreakpointComplications extends BNDTypeBreakpointComplications  {
+        InterChromosomeBreakpointComplications(final ChimericAlignment simpleChimera, final byte[] contigSeq) {
+            initForSuspectedTranslocation(simpleChimera, contigSeq);
+        }
+    }
+
+    // =================================================================================================================
+
+    protected static final List<String> DEFAULT_CIGAR_STRINGS_FOR_DUP_SEQ_ON_CTG = Collections.emptyList();
+
+    protected static final List<Strand> DEFAULT_INV_DUP_REF_ORIENTATION = Collections.singletonList(Strand.POSITIVE);
+    protected static final List<Strand> DEFAULT_INV_DUP_CTG_ORIENTATIONS_FR = Arrays.asList(Strand.POSITIVE, Strand.NEGATIVE);
+    protected static final List<Strand> DEFAULT_INV_DUP_CTG_ORIENTATIONS_RF = Arrays.asList(Strand.NEGATIVE, Strand.POSITIVE);
 
     /**
      * '+' strand representations of micro-homology, inserted sequence and duplicated sequence on the reference.
      */
-    private String homologyForwardStrandRep = "";
-    private String insertedSequenceForwardStrandRep = "";
+    protected String homologyForwardStrandRep = "";
+    protected String insertedSequenceForwardStrandRep = "";
 
-    private boolean hasDuplicationAnnotation = false;
+    protected boolean hasDuplicationAnnotation = false;
 
-    private SimpleInterval dupSeqRepeatUnitRefSpan = null;
-    private int dupSeqRepeatNumOnRef = 0;
-    private int dupSeqRepeatNumOnCtg = 0;
-    private List<Strand> dupSeqStrandOnRef = null;
-    private List<Strand> dupSeqStrandOnCtg = null;
-    private List<String> cigarStringsForDupSeqOnCtg = null;
-    private boolean dupAnnotIsFromOptimization = false;
+    protected SimpleInterval dupSeqRepeatUnitRefSpan = null;
+    protected int dupSeqRepeatNumOnRef = 0;
+    protected int dupSeqRepeatNumOnCtg = 0;
+    protected List<Strand> dupSeqStrandOnRef = null;
+    protected List<Strand> dupSeqStrandOnCtg = null;
+    protected List<String> cigarStringsForDupSeqOnCtg = null;
+    protected boolean dupAnnotIsFromOptimization = false;
 
-    private SimpleInterval invertedTransInsertionRefSpan = null; // TODO: 10/2/17 see ticket 3647
+    protected SimpleInterval invertedTransInsertionRefSpan = null; // TODO: 10/2/17 see ticket 3647
 
     // TODO: consider dups and inserts as well as micro-homology
     /** The uncertainty in location due to complications. */
@@ -89,9 +200,9 @@ public final class BreakpointComplications {
                 attributeMap.put(GATKSVVCFConstants.DUP_ANNOTATIONS_IMPRECISE, "");
             }
 
-            if (getDupSeqStrandOnCtg() != null) {
+            if (getDupSeqOrientationsOnCtg() != null) {
                 attributeMap.put(GATKSVVCFConstants.DUP_ORIENTATIONS,
-                        getDupSeqStrandOnCtg().stream().map(Strand::toString).collect(Collectors.joining()));
+                        getDupSeqOrientationsOnCtg().stream().map(Strand::toString).collect(Collectors.joining()));
             }
         }
         return attributeMap;
@@ -149,11 +260,7 @@ public final class BreakpointComplications {
         return dupSeqRepeatNumOnCtg;
     }
 
-    public List<Strand> getDupSeqStrandOnRef() {
-        return dupSeqStrandOnRef;
-    }
-
-    public List<Strand> getDupSeqStrandOnCtg() {
+    public List<Strand> getDupSeqOrientationsOnCtg() {
         return dupSeqStrandOnCtg;
     }
 
@@ -230,7 +337,7 @@ public final class BreakpointComplications {
 
     // =================================================================================================================
 
-    private void initForSuspectedTranslocation(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
+    protected void initForSuspectedTranslocation(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
         homologyForwardStrandRep = getHomology(chimericAlignment.regionWithLowerCoordOnContig,
                 chimericAlignment.regionWithHigherCoordOnContig, contigSeq);
         insertedSequenceForwardStrandRep = getInsertedSequence(chimericAlignment.regionWithLowerCoordOnContig,
@@ -244,7 +351,7 @@ public final class BreakpointComplications {
      * "significant" (see {@link ChimericAlignment#isLikelyInvertedDuplication()})
      * overlap on their reference spans.
      */
-    private void initForInvDup(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
+    protected void initForInvDup(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
 
         final AlignmentInterval firstAlignmentInterval  = chimericAlignment.regionWithLowerCoordOnContig;
         final AlignmentInterval secondAlignmentInterval = chimericAlignment.regionWithHigherCoordOnContig;
@@ -291,7 +398,7 @@ public final class BreakpointComplications {
 
     //==================================================================================================================
     //////////// BELOW ARE CODE PATH USED FOR INSERTION, DELETION, AND DUPLICATION (INV OR NOT) AND INVERSION, AND ARE TESTED FOR THAT PURPOSE
-    private void initForInversion(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
+    protected void initForInversion(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
 
         final AlignmentInterval firstAlignmentInterval  = chimericAlignment.regionWithLowerCoordOnContig;
         final AlignmentInterval secondAlignmentInterval = chimericAlignment.regionWithHigherCoordOnContig;
@@ -306,7 +413,7 @@ public final class BreakpointComplications {
         hasDuplicationAnnotation = false;
     }
 
-    private void initForInsDel(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
+    protected void initForInsDel(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
 
         final AlignmentInterval firstContigRegion  = chimericAlignment.regionWithLowerCoordOnContig;
         final AlignmentInterval secondContigRegion = chimericAlignment.regionWithHigherCoordOnContig;

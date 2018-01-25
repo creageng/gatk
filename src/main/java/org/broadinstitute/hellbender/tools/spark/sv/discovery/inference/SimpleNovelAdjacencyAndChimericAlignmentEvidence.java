@@ -4,6 +4,7 @@ import com.esotericsoftware.kryo.DefaultSerializer;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
+import com.google.common.collect.Lists;
 import org.broadinstitute.hellbender.utils.Utils;
 
 import java.util.ArrayList;
@@ -29,9 +30,9 @@ public final class SimpleNovelAdjacencyAndChimericAlignmentEvidence {
     }
 
     public SimpleNovelAdjacencyAndChimericAlignmentEvidence(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyReferenceLocations,
-                                                            final List<ChimericAlignment> alignmentEvidence) {
+                                                            final Iterable<ChimericAlignment> alignmentEvidence) {
         this.novelAdjacencyAndInferredAltHaptype = Utils.nonNull( novelAdjacencyReferenceLocations );
-        this.alignmentEvidence = Utils.nonNull( alignmentEvidence );
+        this.alignmentEvidence = Lists.newArrayList( Utils.nonNull(alignmentEvidence) );
     }
 
     private SimpleNovelAdjacencyAndChimericAlignmentEvidence(final Kryo kryo, final Input input) {

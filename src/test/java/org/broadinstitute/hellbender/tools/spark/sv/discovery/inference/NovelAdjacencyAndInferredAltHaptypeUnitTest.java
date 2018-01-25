@@ -5,20 +5,21 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import htsjdk.samtools.TextCigarCodec;
 import org.apache.commons.lang3.StringUtils;
+import org.broadinstitute.hellbender.GATKBaseTest;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscoveryArgumentCollection;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.SVDiscoveryTestDataProvider;
-import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.*;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AlignedContig;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AlignmentInterval;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.ContigAlignmentsModifier;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.StrandSwitch;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
-import org.broadinstitute.hellbender.GATKBaseTest;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import scala.Tuple2;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -73,18 +74,18 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
     // Tests for generic functions on the base class
     // -----------------------------------------------------------------------------------------------
     @Test(groups = "sv")
-    public void testEqualsAndHashCode() throws Exception {
+    public void testEqualsAndHashCode() {
 
         final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype1 = getBreakpoints("asm00001:tig0001", "foo");
 
         final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype2 = getBreakpoints("asm00002:tig0002", "bar");
 
-        Assert.assertTrue(novelAdjacencyAndInferredAltHaptype1.equals(novelAdjacencyAndInferredAltHaptype2));
+        Assert.assertEquals(novelAdjacencyAndInferredAltHaptype1, novelAdjacencyAndInferredAltHaptype2);
         Assert.assertEquals(novelAdjacencyAndInferredAltHaptype1.hashCode(), novelAdjacencyAndInferredAltHaptype2.hashCode());
     }
 
     @Test(groups = "sv")
-    void testKryoSerializer() throws IOException {
+    void testKryoSerializer() {
         // uses inversion subclass for testing
         final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype1 = getBreakpoints("asm00001:tig0001", "foo");
         final ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -122,7 +123,7 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
     }
 
     @Test(groups = "sv")
-    public void testGetAssembledBreakpointFromAlignmentIntervalsStrangeLeftBreakpoint() throws Exception {
+    public void testGetAssembledBreakpointFromAlignmentIntervalsStrangeLeftBreakpoint() {
 
         final NovelAdjacencyAndInferredAltHaptype breakpoints = SVDiscoveryTestDataProvider.forSimpleInversionFromLongCtg1WithStrangeLeftBreakpoint._3();
         seeIfItWorks(breakpoints, StrandSwitch.REVERSE_TO_FORWARD,
@@ -163,7 +164,7 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
     }
 
     @Test(groups = "sv")
-    public void testGetAssembledBreakpointsFromAlignmentIntervalsWithOverlappingAlignmentInterval() throws Exception {
+    public void testGetAssembledBreakpointsFromAlignmentIntervalsWithOverlappingAlignmentInterval() {
         final byte[] contigSequence = "ACTAGAGCATCTACGTGTTCCTGTGGTTTTGGAGCAAGAGTGATTTGAGTTTCAGAGATTTTTACTAATTCTTCTTCCCCTACCAGAAAAAAAGATCTTACCATTTGAGAGTGAGATGTAAACCCAGCCCTGTCTGACCTGAGTCTGTGCCCTAAGCCTATGCTAAGCCAAGCAGTGCCTGGAGCCACCACAGGTCCACACAATTCGTTAACATGATGAAGCAAGGATGGAAATTGGACAAAATAGTGTGCCTACTGAATCTAAGAATGAAAAATGATTGCACTCCTACTCTGAGTGCTTTGGAGCACTGCCCAGTTGGGCAAAGGGTCAGCGCCTGGGCAGAGGTCCCCACAACCTGGCAGGAGTGTGGTCGGCCACCCTATGGGCCTCCATCATGTGCAGTGACAGCGGGGCTGTCATGTCACCGTGTGGGAGGGCTTGCAGGTGAAGTGGTCTGGGAGGGGTCCCCCAGACAAAGCCAAGGTTCTGAGAGTTGGCCCGAACACTGCTGGATTCCACTTCACCTGCAAGCCCTCCCACACGGTGACATGACAGCCTATAATACAGTTCCGCATGGCCACGTCATACAACCCTGTCATATTGGTGAGCAATTGCTGTGTAGCCAAAGACCCCAAAACTCAAACAGCATTTATTATTATTGCCCCCATGTCTGAGAGTCAGATGTGCATTTGCTGATCTCAGCTTGTTTGAGCTGCTGCAGGGTTGGGGCTCTGCTCCAGGCAGGCTTAGCTGTCACCACATGCACACATACATTCTGGGCCTCTGCTGCGCGCGTCACGTTCACTGAAGATCTTGGGATTGGGAGTTAGGGCGGTGGGAGGGCCCAGCAAAGTCACCTGGCGATGGCAGGGACACAGGGAGGAATGTAGAATGGGGCCGATGATGGGACCCACACGTCTGCAAAGCTGCGGTCTCCTTGAGGGGTGGAGACAGCAACAACTCACCGCACGCGGTGCTTCAGTTCACCATCTCCCTGGGACATTAGGGGGCCCCGTGTTATCTCATTTTGCTCTGGTTTGCATTAGTTTTTTATCACTTCGTAGATGAAGCCACTGACACCCAGAGAGGGAAAGTGGCCTGACCAAGGGCCACAGCAGGGGAGCGAAGGAGCCCCACAGTTCGGCAGGAACACAGCCTCTCCCTGGCTTTCAGGTTCACTGACATCTTCTCATGGCCTCTGTAACTCACCAGGCATCAGGGTGTAGTCCTTAGACCAGTGTCCCACAGCTGCCACAGAGTGGGAGCTCACCATCAGTTATAAGTCACTAGAAAGGCTTTTGGACATTATAAGCTACAATGGAAAATAAGTCATCTGTGGATTTTTGTGACAGATTCCAAAAATTTGAATATTTTGTCTACTTAGGTTTTTGGTTAATTTTATCCTCAAAACTGTTCTGCAGTGATTAAGCTGTACAAACTGCATCATGGGCGAATTGGCATATTCAGAAATGACTGATATTCTTGATTTCAGTTTTTTACTTTGTATGTAGCTCCTCAAGGAAAC".getBytes();
         final AlignmentInterval region1 = new AlignmentInterval(new SimpleInterval("20", 23102817, 23103304), 1, 487, TextCigarCodec.decode("487M1006S"), true, 60, 1, 100, ContigAlignmentsModifier.AlnModType.NONE);
         final AlignmentInterval region2 = new AlignmentInterval(new SimpleInterval("20", 23103196, 23103238), 484, 525, TextCigarCodec.decode("483S42M968S"), false, 60, 2, 100, ContigAlignmentsModifier.AlnModType.NONE);
@@ -185,33 +186,36 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
     }
 
     // following might be legacy tests that could be removed but needs time to investigate (Dec.13/2016)
-    @Test(groups = "sv")
-    public void testGetBreakpoints_5to3Inversion_simple() throws IOException {
-        final AlignmentInterval region1 = new AlignmentInterval(new SimpleInterval("20", 101, 200), 1, 100, TextCigarCodec.decode("100M100S"), true, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
-        final AlignmentInterval region2 = new AlignmentInterval(new SimpleInterval("20", 501, 600), 101, 200, TextCigarCodec.decode("100S100M"), false, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
-        final ChimericAlignment chimericAlignment = new ChimericAlignment(region1, region2, Collections.emptyList(), "1", SVDiscoveryTestDataProvider.seqDict);
-        final Tuple2<SimpleInterval, SimpleInterval> breakpoints = NovelAdjacencyAndInferredAltHaptype.leftJustifyBreakpoints(chimericAlignment, DEFAULT_BREAKPOINT_COMPLICATIONS, SVDiscoveryTestDataProvider.seqDict);
-        Assert.assertEquals(breakpoints._1(), new SimpleInterval("20", 200, 200));
-        Assert.assertEquals(breakpoints._2(), new SimpleInterval("20", 600, 600));
-    }
-
-    @Test(groups = "sv")
-    public void testGetBreakpoints_5to3Inversion_withSimpleHomology() throws IOException {
-        final AlignmentInterval region1 = new AlignmentInterval(new SimpleInterval("20", 101, 205), 1, 105, TextCigarCodec.decode("105M100S"), true, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
-        final AlignmentInterval region2 = new AlignmentInterval(new SimpleInterval("20", 501, 605), 96, 200, TextCigarCodec.decode("105M100S"), false, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
-        final ChimericAlignment chimericAlignment = new ChimericAlignment(region1, region2, Collections.emptyList(), "1", SVDiscoveryTestDataProvider.seqDict);
-        final BreakpointComplications homologyComplications = new BreakpointComplications("ACACA", "",
-                DEFAULT_BREAKPOINT_COMPLICATIONS.hasDuplicationAnnotation(), DEFAULT_BREAKPOINT_COMPLICATIONS.getDupSeqRepeatUnitRefSpan(), DEFAULT_BREAKPOINT_COMPLICATIONS.getDupSeqRepeatNumOnRef(), DEFAULT_BREAKPOINT_COMPLICATIONS.getDupSeqRepeatNumOnCtg(), null, null, DEFAULT_BREAKPOINT_COMPLICATIONS.getCigarStringsForDupSeqOnCtg(), DEFAULT_BREAKPOINT_COMPLICATIONS.isDupAnnotIsFromOptimization(), null);
-        final Tuple2<SimpleInterval, SimpleInterval> breakpoints = NovelAdjacencyAndInferredAltHaptype.leftJustifyBreakpoints(chimericAlignment, homologyComplications, SVDiscoveryTestDataProvider.seqDict);
-        Assert.assertEquals(breakpoints._1(), new SimpleInterval("20", 200, 200));
-        Assert.assertEquals(breakpoints._2(), new SimpleInterval("20", 605, 605));
-    }
+//    @Test(groups = "sv")
+//    public void testGetBreakpoints_5to3Inversion_simple() {
+//        final AlignmentInterval region1 = new AlignmentInterval(new SimpleInterval("20", 101, 200), 1, 100, TextCigarCodec.decode("100M100S"), true, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
+//        final AlignmentInterval region2 = new AlignmentInterval(new SimpleInterval("20", 501, 600), 101, 200, TextCigarCodec.decode("100S100M"), false, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
+//        final ChimericAlignment chimericAlignment = new ChimericAlignment(region1, region2, Collections.emptyList(), "1", SVDiscoveryTestDataProvider.seqDict);
+//        final Tuple2<SimpleInterval, SimpleInterval> breakpoints =
+//                BreakpointsInference.getInferenceClass(chimericAlignment, DEFAULT_BREAKPOINT_COMPLICATIONS, SVDiscoveryTestDataProvider.seqDict)
+//                .getLeftJustifiedBreakpoints();
+//        Assert.assertEquals(breakpoints._1(), new SimpleInterval("20", 200, 200));
+//        Assert.assertEquals(breakpoints._2(), new SimpleInterval("20", 600, 600));
+//    }
+//
+//    @Test(groups = "sv")
+//    public void testGetBreakpoints_5to3Inversion_withSimpleHomology() {
+//        final AlignmentInterval region1 = new AlignmentInterval(new SimpleInterval("20", 101, 205), 1, 105, TextCigarCodec.decode("105M100S"), true, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
+//        final AlignmentInterval region2 = new AlignmentInterval(new SimpleInterval("20", 501, 605), 96, 200, TextCigarCodec.decode("105M100S"), false, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
+//        final ChimericAlignment chimericAlignment = new ChimericAlignment(region1, region2, Collections.emptyList(), "1", SVDiscoveryTestDataProvider.seqDict);
+//        final BreakpointComplications homologyComplications = new BreakpointComplications("ACACA", "",
+//                DEFAULT_BREAKPOINT_COMPLICATIONS.hasDuplicationAnnotation(), DEFAULT_BREAKPOINT_COMPLICATIONS.getDupSeqRepeatUnitRefSpan(), DEFAULT_BREAKPOINT_COMPLICATIONS.getDupSeqRepeatNumOnRef(), DEFAULT_BREAKPOINT_COMPLICATIONS.getDupSeqRepeatNumOnCtg(), null, null, DEFAULT_BREAKPOINT_COMPLICATIONS.getCigarStringsForDupSeqOnCtg(), DEFAULT_BREAKPOINT_COMPLICATIONS.isDupAnnotIsFromOptimization(), null);
+//        final Tuple2<SimpleInterval, SimpleInterval> breakpoints =
+//                BreakpointsInference.getInferenceClass(chimericAlignment, homologyComplications, SVDiscoveryTestDataProvider.seqDict).getLeftJustifiedBreakpoints();
+//        Assert.assertEquals(breakpoints._1(), new SimpleInterval("20", 200, 200));
+//        Assert.assertEquals(breakpoints._2(), new SimpleInterval("20", 605, 605));
+//    }
 
     // -----------------------------------------------------------------------------------------------
     // Tests for complication resolving and breakpoint justification with the inferred complications for insertion and deletion
     // -----------------------------------------------------------------------------------------------
     @Test(expectedExceptions = GATKException.class)
-    public void testGetBreakpoints_ExpectException() throws IOException {
+    public void testGetBreakpoints_ExpectException() {
         final AlignmentInterval region1 = new AlignmentInterval(new SimpleInterval("21", 100001, 100100), 1 ,100, TextCigarCodec.decode("100M"), true, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
         final AlignmentInterval region2 = new AlignmentInterval(new SimpleInterval("21", 100101, 100200), 101 ,200, TextCigarCodec.decode("100M"), true, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
         final ChimericAlignment chimericAlignment = new ChimericAlignment(region1, region2, Collections.emptyList(), "1", SVDiscoveryTestDataProvider.seqDict);
@@ -222,7 +226,7 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
      * @see SVDiscoveryTestDataProvider#forSimpleDeletion(ByteArrayOutputStream)
      */
     @Test(groups = "sv")
-    public void testGetBreakpoints_simpleDeletion() throws IOException {
+    public void testGetBreakpoints_simpleDeletion() {
 
         final NovelAdjacencyAndInferredAltHaptype breakpoints = SVDiscoveryTestDataProvider.forSimpleDeletion_plus._3();
         final NovelAdjacencyAndInferredAltHaptype breakpointsDetectedFromReverseStrand = SVDiscoveryTestDataProvider.forSimpleDeletion_minus._3();
@@ -236,7 +240,7 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
      * @see SVDiscoveryTestDataProvider#forSimpleInsertion(ByteArrayOutputStream)
      */
     @Test(groups = "sv")
-    public void testGetBreakpoints_simpleInsertion() throws IOException {
+    public void testGetBreakpoints_simpleInsertion() {
 
         byte[] insertedSeq  = SVDiscoveryTestDataProvider.makeDummySequence(50, (byte)'C');
 
@@ -252,7 +256,7 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
      * @see SVDiscoveryTestDataProvider#forLongRangeSubstitution()
      */
     @Test(groups = "sv")
-    public void testGetBreakpoints_longRangeSubstitution() throws IOException {
+    public void testGetBreakpoints_longRangeSubstitution() {
 
         final byte[] substitution = SVDiscoveryTestDataProvider.makeDummySequence(10, (byte)'C');
         final NovelAdjacencyAndInferredAltHaptype breakpoints = SVDiscoveryTestDataProvider.forLongRangeSubstitution_plus._3();
@@ -267,7 +271,7 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
      * @see SVDiscoveryTestDataProvider#forDeletionWithHomology(ByteArrayOutputStream)
      */
     @Test(groups = "sv")
-    public void testGetBreakpoints_simpleDeletion_withHomology() throws IOException {
+    public void testGetBreakpoints_simpleDeletion_withHomology() {
 
         final byte[] homology = "ATCG".getBytes();
 
@@ -283,7 +287,7 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
      * @see SVDiscoveryTestDataProvider#forSimpleTandemDuplicationContraction()
      */
     @Test(groups = "sv")
-    public void testGetBreakpoints_tandemDuplication_contraction_simple() throws IOException {
+    public void testGetBreakpoints_tandemDuplication_contraction_simple() {
 
         final NovelAdjacencyAndInferredAltHaptype breakpoints = SVDiscoveryTestDataProvider.forSimpleTanDupContraction_plus._3();
         final NovelAdjacencyAndInferredAltHaptype breakpointsDetectedFromReverseStrand = SVDiscoveryTestDataProvider.forSimpleTanDupContraction_minus._3();
@@ -299,7 +303,7 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
      * @see SVDiscoveryTestDataProvider#forSimpleTandemDuplicationExpansion(ByteArrayOutputStream)
      */
     @Test(groups = "sv")
-    public void testGetBreakpoints_tandemDuplication_expansion_simple() throws IOException {
+    public void testGetBreakpoints_tandemDuplication_expansion_simple() {
 
         final NovelAdjacencyAndInferredAltHaptype breakpoints = SVDiscoveryTestDataProvider.forSimpleTanDupExpansion_plus._3();
         final NovelAdjacencyAndInferredAltHaptype breakpointsDetectedFromReverseStrand = SVDiscoveryTestDataProvider.forSimpleTanDupExpansion_minus._3();
@@ -315,7 +319,7 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
      * @see SVDiscoveryTestDataProvider#forSimpleTandemDuplicationExpansionWithNovelInsertion(ByteArrayOutputStream)
      */
     @Test(groups = "sv")
-    public void testGetBreakpoints_tandemDuplication_expansion_andNovelInsertion() throws IOException {
+    public void testGetBreakpoints_tandemDuplication_expansion_andNovelInsertion() {
 
         final byte[] insertedSeq = "CTCTCTCTCT".getBytes();                                                                           //10
         final byte[] dup = "AAAAGTAAATGTTATAAGAAATCTTAAGTATTATTTTCTTATGTTTCTAGCCTAATAAAGTGCTTTTATTAAAGCACTTTATTTAAAGG".getBytes();    //89

@@ -4,7 +4,6 @@ import com.esotericsoftware.kryo.DefaultSerializer;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.SAMSequenceDictionary;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AlignedContig;
@@ -39,16 +38,21 @@ public class NovelAdjacencyAndInferredAltHaptype {
         strandSwitch = chimericAlignment.strandSwitch;
 
         try {
-            complication = new BreakpointComplications(chimericAlignment, contigSequence);
 
-            final Tuple2<SimpleInterval, SimpleInterval> leftJustifiedBreakpoints =
-                    leftJustifyBreakpoints(chimericAlignment, complication, referenceDictionary);
+            final BreakpointsInference inferredClass =
+                    BreakpointsInference.getInferenceClass(chimericAlignment, contigSequence, referenceDictionary);
+
+            final Tuple2<SimpleInterval, SimpleInterval> leftJustifiedBreakpoints = inferredClass.getLeftJustifiedBreakpoints();
             leftJustifiedLeftRefLoc = leftJustifiedBreakpoints._1();
             leftJustifiedRightRefLoc = leftJustifiedBreakpoints._2();
 
-            altHaplotypeSequence =
-                    SimpleNovelAdjacencyInterpreter.BreakpointsInference.getInferenceClass(chimericAlignment, complication, referenceDictionary)
-                            .getInferredAltHaplotypeSequence();
+            complication = inferredClass.getComplications();
+
+            validateInferredLocations(leftJustifiedLeftRefLoc, leftJustifiedRightRefLoc, referenceDictionary,
+                                      chimericAlignment, complication);
+
+            altHaplotypeSequence = inferredClass.getInferredAltHaplotypeSequence();
+
         } catch (final IllegalArgumentException iaex) { // catching IAEX specifically because it is the most likely exception thrown if there's bug, this helps quickly debugging what the problem is
             throw new GATKException("Erred when inferring breakpoint location and event type from chimeric alignment:\n" +
                     chimericAlignment.toString(), iaex);
@@ -78,25 +82,6 @@ public class NovelAdjacencyAndInferredAltHaptype {
                 altHaplotypeSequence[i] = input.readByte();
             }
         }
-    }
-
-    /**
-     * Returns the reference coordinates of the upstream and downstream breakpoints implied by input {@code chimericAlignment}.
-     * If there is homologous sequence represented in the alignments, it will be assigned to the side of the breakpoint
-     * with higher reference coordinates, i.e. we follow left alignment convention here.
-     */
-    @VisibleForTesting
-    static Tuple2<SimpleInterval, SimpleInterval> leftJustifyBreakpoints(final ChimericAlignment chimericAlignment,
-                                                                         final BreakpointComplications complication,
-                                                                         final SAMSequenceDictionary referenceDictionary) {
-
-        final Tuple2<SimpleInterval, SimpleInterval> leftAdjustedBreakpoints =
-                SimpleNovelAdjacencyInterpreter.BreakpointsInference.getInferenceClass(chimericAlignment, complication, referenceDictionary)
-                        .getLeftJustifiedBreakpoints();
-
-        validateInferredLocations(leftAdjustedBreakpoints._1, leftAdjustedBreakpoints._2, referenceDictionary, chimericAlignment, complication);
-
-        return leftAdjustedBreakpoints;
     }
 
     private static void validateInferredLocations(final SimpleInterval leftBreakpoint, final SimpleInterval rightBreakpoint,
