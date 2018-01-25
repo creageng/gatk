@@ -7,8 +7,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.broadinstitute.hellbender.engine.datasources.ReferenceMultiSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.StrandSwitch;
-import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.NovelAdjacencyReferenceLocations;
-import org.broadinstitute.hellbender.tools.spark.sv.utils.GATKSVVCFConstants;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.NovelAdjacencyAndInferredAltHaptype;
 import org.broadinstitute.hellbender.utils.IntervalUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import scala.Tuple2;
@@ -30,11 +29,11 @@ public abstract class BreakEndVariantType extends SvType {
         return isTheUpstreamMate;
     }
 
-    protected static SimpleInterval getMateRefLoc(final NovelAdjacencyReferenceLocations narl, final boolean forUpstreamLoc) {
+    protected static SimpleInterval getMateRefLoc(final NovelAdjacencyAndInferredAltHaptype narl, final boolean forUpstreamLoc) {
         return forUpstreamLoc ? narl.leftJustifiedRightRefLoc : narl.leftJustifiedLeftRefLoc;
     }
 
-    protected static String getIDString(final NovelAdjacencyReferenceLocations narl, final boolean forUpstreamLoc) {
+    protected static String getIDString(final NovelAdjacencyAndInferredAltHaptype narl, final boolean forUpstreamLoc) {
         return BREAKEND_STR + INTERVAL_VARIANT_ID_FIELD_SEPARATOR +
                 narl.leftJustifiedLeftRefLoc.getContig() + INTERVAL_VARIANT_ID_FIELD_SEPARATOR +
                 narl.leftJustifiedLeftRefLoc.getEnd() + INTERVAL_VARIANT_ID_FIELD_SEPARATOR +
@@ -102,7 +101,7 @@ public abstract class BreakEndVariantType extends SvType {
             indicatesInv55 = indicatesInv55(bracketPointsLeft, basesFirst);
         }
 
-        public static Tuple2<BreakEndVariantType, BreakEndVariantType> getOrderedMates(final NovelAdjacencyReferenceLocations narl,
+        public static Tuple2<BreakEndVariantType, BreakEndVariantType> getOrderedMates(final NovelAdjacencyAndInferredAltHaptype narl,
                                                                                        final ReferenceMultiSource reference) {
 
             // inversion breakend formatted records have "bracketPointsLeft" "basesFirst" taking the same value (see spec)
@@ -126,7 +125,7 @@ public abstract class BreakEndVariantType extends SvType {
             return new Tuple2<>(upstreamBreakpoint, downstreamBreakpoint);
         }
 
-        static byte[] extractBasesForAltAllele(final NovelAdjacencyReferenceLocations narl, final boolean forUpstreamLoc,
+        static byte[] extractBasesForAltAllele(final NovelAdjacencyAndInferredAltHaptype narl, final boolean forUpstreamLoc,
                                                final ReferenceMultiSource reference) {
             try {
                 final byte[] ref = reference
@@ -161,7 +160,7 @@ public abstract class BreakEndVariantType extends SvType {
             return STRANDSWITCHLESS_BND;
         }
 
-        private TransLocBND(final NovelAdjacencyReferenceLocations narl, final boolean forUpstreamLoc,
+        private TransLocBND(final NovelAdjacencyAndInferredAltHaptype narl, final boolean forUpstreamLoc,
                             final ReferenceMultiSource reference, final SAMSequenceDictionary referenceDictionary,
                             final boolean basesFirst, final boolean bracketPointsLeft) {
             super(getIDString(narl, forUpstreamLoc), emptyMap,
@@ -169,7 +168,7 @@ public abstract class BreakEndVariantType extends SvType {
                     getMateRefLoc(narl, forUpstreamLoc), basesFirst, forUpstreamLoc);
         }
 
-        public static Tuple2<BreakEndVariantType, BreakEndVariantType> getOrderedMates(final NovelAdjacencyReferenceLocations narl,
+        public static Tuple2<BreakEndVariantType, BreakEndVariantType> getOrderedMates(final NovelAdjacencyAndInferredAltHaptype narl,
                                                                                        final ReferenceMultiSource reference,
                                                                                        final SAMSequenceDictionary referenceDictionary) {
             final boolean isSameChr = narl.leftJustifiedLeftRefLoc.getContig().equals(narl.leftJustifiedRightRefLoc.getContig());
@@ -195,7 +194,7 @@ public abstract class BreakEndVariantType extends SvType {
             return new Tuple2<>(bkpt_1, bkpt_2);
         }
 
-        static byte[] extractBasesForAltAllele(final NovelAdjacencyReferenceLocations narl, final boolean forUpstreamLoc,
+        static byte[] extractBasesForAltAllele(final NovelAdjacencyAndInferredAltHaptype narl, final boolean forUpstreamLoc,
                                                final ReferenceMultiSource reference, final SAMSequenceDictionary referenceDictionary) {
             try {
                 final SimpleInterval refLoc = forUpstreamLoc ? narl.leftJustifiedLeftRefLoc : narl.leftJustifiedRightRefLoc;

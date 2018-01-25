@@ -13,7 +13,7 @@ import org.broadinstitute.hellbender.engine.spark.SparkContextFactory;
 import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscoveryArgumentCollection;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AlignmentInterval;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.ChimericAlignment;
-import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.NovelAdjacencyReferenceLocations;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.NovelAdjacencyAndInferredAltHaptype;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.SimpleNovelAdjacencyInterpreter;
 import org.broadinstitute.hellbender.tools.spark.sv.evidence.EvidenceTargetLink;
 import org.broadinstitute.hellbender.tools.spark.sv.evidence.ReadMetadata;
@@ -57,7 +57,7 @@ public class AnnotatedVariantProducerUnitTest extends GATKBaseTest {
      * Not an exhaustive test on all attributes, only tests:
      * MAPPING_QUALITIES, ALIGNMENT_LENGTH
      */
-    private static void seeIfItWorks_evidenceAnnotation(final Tuple4<AlignmentInterval, AlignmentInterval, NovelAdjacencyReferenceLocations, String> testData,
+    private static void seeIfItWorks_evidenceAnnotation(final Tuple4<AlignmentInterval, AlignmentInterval, NovelAdjacencyAndInferredAltHaptype, String> testData,
                                                         final String[] expectedMappingQualitiesAsStrings,
                                                         final String[] expectedAlignmentLengthsAsStrings) {
 
@@ -78,7 +78,7 @@ public class AnnotatedVariantProducerUnitTest extends GATKBaseTest {
     public void testGetEvidenceRelatedAnnotations() {
 
         // inversion
-        Tuple4<AlignmentInterval, AlignmentInterval, NovelAdjacencyReferenceLocations, String> testData = SVDiscoveryTestDataProvider.forSimpleInversionFromLongCtg1WithStrangeLeftBreakpoint;
+        Tuple4<AlignmentInterval, AlignmentInterval, NovelAdjacencyAndInferredAltHaptype, String> testData = SVDiscoveryTestDataProvider.forSimpleInversionFromLongCtg1WithStrangeLeftBreakpoint;
 
         seeIfItWorks_evidenceAnnotation(testData, new String[]{"60"}, new String[]{String.valueOf(1984)});
 
@@ -141,7 +141,7 @@ public class AnnotatedVariantProducerUnitTest extends GATKBaseTest {
     // -----------------------------------------------------------------------------------------------
     // Integrative test
     // -----------------------------------------------------------------------------------------------
-    private static void seeIfItWorks_integrative(final Tuple4<AlignmentInterval, AlignmentInterval, NovelAdjacencyReferenceLocations, String> testData,
+    private static void seeIfItWorks_integrative(final Tuple4<AlignmentInterval, AlignmentInterval, NovelAdjacencyAndInferredAltHaptype, String> testData,
                                                  final List<String> expectedAttributeKeys, final String sampleId) throws IOException {
 
         final AlignmentInterval region1 = testData._1();
@@ -149,7 +149,7 @@ public class AnnotatedVariantProducerUnitTest extends GATKBaseTest {
 
         final Iterable<ChimericAlignment> evidence = Collections.singletonList(new ChimericAlignment(region1, region2, Collections.emptyList(), testData._4(), SVDiscoveryTestDataProvider.seqDict));
 
-        final NovelAdjacencyReferenceLocations breakpoints = testData._3();
+        final NovelAdjacencyAndInferredAltHaptype breakpoints = testData._3();
 
         final VariantContext variantContext =
                 AnnotatedVariantProducer.produceAnnotatedVcFromInferredTypeAndRefLocations(breakpoints.leftJustifiedLeftRefLoc,
@@ -172,7 +172,7 @@ public class AnnotatedVariantProducerUnitTest extends GATKBaseTest {
         final String sampleId = "sample";
         
         // inversion
-        Tuple4<AlignmentInterval, AlignmentInterval, NovelAdjacencyReferenceLocations, String> testData = SVDiscoveryTestDataProvider.forSimpleInversionFromLongCtg1WithStrangeLeftBreakpoint;
+        Tuple4<AlignmentInterval, AlignmentInterval, NovelAdjacencyAndInferredAltHaptype, String> testData = SVDiscoveryTestDataProvider.forSimpleInversionFromLongCtg1WithStrangeLeftBreakpoint;
 
         seeIfItWorks_integrative(testData, Stream.concat( commonAttributes.stream(),
                 Sets.newHashSet(GATKSVVCFConstants.INV33, GATKSVVCFConstants.HOMOLOGY, GATKSVVCFConstants.HOMOLOGY_LENGTH).stream()).sorted().collect(Collectors.toList()), sampleId);

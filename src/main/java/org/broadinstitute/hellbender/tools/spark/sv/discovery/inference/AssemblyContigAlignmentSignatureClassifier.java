@@ -103,6 +103,7 @@ public final class AssemblyContigAlignmentSignatureClassifier {
         // first remove overlap, if any
         final JavaRDD<AssemblyContigWithFineTunedAlignments> preprocessedContigs = contigsWithOnlyOneBestConfigAnd2AI.map(
                 decoratedContig -> {
+                    // TODO: 1/24/18 bug, see ticket 3894
                     final AlignedContig contig = decoratedContig.getSourceContig();
                     final AlignmentInterval one = contig.alignmentIntervals.get(0),
                                             two = contig.alignmentIntervals.get(1);

@@ -27,7 +27,7 @@ public class SvSimpleTypeInferenceUnitTest extends GATKBaseTest {
     }
 
 
-    private static void seeIfItWorks_typeInference(final NovelAdjacencyReferenceLocations breakpoints,
+    private static void seeIfItWorks_typeInference(final NovelAdjacencyAndInferredAltHaptype breakpoints,
                                                    final String expectedTypeString,
                                                    final Set<String> expectedFlags) {
 
@@ -43,7 +43,7 @@ public class SvSimpleTypeInferenceUnitTest extends GATKBaseTest {
     public void testGetType() throws IOException {
 
         // inversion
-        NovelAdjacencyReferenceLocations breakpoints = SVDiscoveryTestDataProvider.forSimpleInversionFromLongCtg1WithStrangeLeftBreakpoint._3();
+        NovelAdjacencyAndInferredAltHaptype breakpoints = SVDiscoveryTestDataProvider.forSimpleInversionFromLongCtg1WithStrangeLeftBreakpoint._3();
         seeIfItWorks_typeInference(breakpoints, SimpleSVType.TYPES.INV.name(), ImmutableSet.of(GATKSVVCFConstants.INV33));
 
         breakpoints = SVDiscoveryTestDataProvider.forSimpleInversionWithHom_leftPlus._3();

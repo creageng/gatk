@@ -15,7 +15,7 @@ import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscovery
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AlignmentInterval;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.BreakpointComplications;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.ChimericAlignment;
-import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.NovelAdjacencyReferenceLocations;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.NovelAdjacencyAndInferredAltHaptype;
 import org.broadinstitute.hellbender.tools.spark.sv.evidence.EvidenceTargetLink;
 import org.broadinstitute.hellbender.tools.spark.sv.evidence.ReadMetadata;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.*;
@@ -37,14 +37,14 @@ public class AnnotatedVariantProducer implements Serializable {
 
     /**
      * Given novel adjacency and inferred BND variant types, produce annotated (and mate-connected) VCF BND records.
-     * @param novelAdjacencyReferenceLocations  novel adjacency suggesting BND records
+     * @param novelAdjacencyAndInferredAltHaptype  novel adjacency suggesting BND records
      * @param breakendMates                     BND variants of mates to each other, assumed to be of size 2
      * @param contigAlignments                  chimeric alignments of supporting contig
      * @param broadcastReference                reference
      * @param broadcastSequenceDictionary
      * @throws IOException                      due to reference retrieval
      */
-    public static List<VariantContext> produceAnnotatedBNDmatesVcFromNovelAdjacency(final NovelAdjacencyReferenceLocations novelAdjacencyReferenceLocations,
+    public static List<VariantContext> produceAnnotatedBNDmatesVcFromNovelAdjacency(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype,
                                                                                     final Tuple2<BreakEndVariantType, BreakEndVariantType> breakendMates,
                                                                                     final Iterable<ChimericAlignment> contigAlignments,
                                                                                     final Broadcast<ReferenceMultiSource> broadcastReference,
@@ -53,13 +53,13 @@ public class AnnotatedVariantProducer implements Serializable {
             throws IOException {
 
         final VariantContext firstMate =
-                produceAnnotatedVcFromInferredTypeAndRefLocations(novelAdjacencyReferenceLocations.leftJustifiedLeftRefLoc, -1,
-                        novelAdjacencyReferenceLocations.complication, breakendMates._1, null, contigAlignments,
+                produceAnnotatedVcFromInferredTypeAndRefLocations(novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc, -1,
+                        novelAdjacencyAndInferredAltHaptype.complication, breakendMates._1, null, contigAlignments,
                         broadcastReference, broadcastSequenceDictionary, null, sampleId);
 
         final VariantContext secondMate =
-                produceAnnotatedVcFromInferredTypeAndRefLocations(novelAdjacencyReferenceLocations.leftJustifiedRightRefLoc, -1,
-                        novelAdjacencyReferenceLocations.complication, breakendMates._2, null, contigAlignments,
+                produceAnnotatedVcFromInferredTypeAndRefLocations(novelAdjacencyAndInferredAltHaptype.leftJustifiedRightRefLoc, -1,
+                        novelAdjacencyAndInferredAltHaptype.complication, breakendMates._2, null, contigAlignments,
                         broadcastReference, broadcastSequenceDictionary, null, sampleId);
 
         final VariantContextBuilder builder0 = new VariantContextBuilder(firstMate);
@@ -72,7 +72,7 @@ public class AnnotatedVariantProducer implements Serializable {
     }
 
     /**
-     * Produces a VC from a {@link NovelAdjacencyReferenceLocations}
+     * Produces a VC from a {@link NovelAdjacencyAndInferredAltHaptype}
      * (consensus among different assemblies if they all point to the same breakpoint).
      * @param refLoc                            corresponds to POS field of the returned VC, hence must be a point location.
      * @param end                               END of the VC, assumed to be < 0 if for BND formatted variant
@@ -256,7 +256,7 @@ public class AnnotatedVariantProducer implements Serializable {
     }
 
     /**
-     * Utility structs for extraction information from the consensus NovelAdjacencyReferenceLocations out of multiple ChimericAlignments,
+     * Utility structs for extraction information from the consensus NovelAdjacencyAndInferredAltHaptype out of multiple ChimericAlignments,
      * to be later added to annotations of the VariantContext extracted.
      */
     private static final class ChimericContigAlignmentEvidenceAnnotations implements Serializable {
