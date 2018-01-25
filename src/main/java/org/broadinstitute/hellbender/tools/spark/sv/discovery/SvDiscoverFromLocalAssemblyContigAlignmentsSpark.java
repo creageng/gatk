@@ -255,10 +255,10 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
                             if (svTypes.size() == 1) { // simple SV type
                                 final SvType inferredType = svTypes.get(0);
                                 final NovelAdjacencyAndInferredAltHaptype narl = simpleNovelAdjacencyAndChimericAlignmentEvidence.getNovelAdjacencyReferenceLocations();
-                                final SimpleInterval variantPos = narl.leftJustifiedLeftRefLoc;
-                                final int end = narl.leftJustifiedRightRefLoc.getEnd();
+                                final SimpleInterval variantPos = narl.getLeftJustifiedLeftRefLoc();
+                                final int end = narl.getLeftJustifiedRightRefLoc().getEnd();
                                 final VariantContext variantContext = AnnotatedVariantProducer
-                                        .produceAnnotatedVcFromInferredTypeAndRefLocations(variantPos, end, narl.complication,
+                                        .produceAnnotatedVcFromInferredTypeAndRefLocations(variantPos, end, narl.getComplication(),
                                                 inferredType, simpleNovelAdjacencyAndChimericAlignmentEvidence.getAltHaplotypeSequence(), simpleNovelAdjacencyAndChimericAlignmentEvidence.getAlignmentEvidence(),
                                                 referenceBroadcast, referenceSequenceDictionaryBroadcast, cnvCallsBroadcast, sampleId);
                                 return Collections.singletonList(variantContext).iterator();

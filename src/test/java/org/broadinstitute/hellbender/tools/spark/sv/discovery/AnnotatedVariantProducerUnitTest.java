@@ -152,8 +152,8 @@ public class AnnotatedVariantProducerUnitTest extends GATKBaseTest {
         final NovelAdjacencyAndInferredAltHaptype breakpoints = testData._3();
 
         final VariantContext variantContext =
-                AnnotatedVariantProducer.produceAnnotatedVcFromInferredTypeAndRefLocations(breakpoints.leftJustifiedLeftRefLoc,
-                        breakpoints.leftJustifiedRightRefLoc.getStart(), breakpoints.complication, SimpleNovelAdjacencyInterpreter.inferSimpleTypeFromNovelAdjacency(breakpoints),
+                AnnotatedVariantProducer.produceAnnotatedVcFromInferredTypeAndRefLocations(breakpoints.getLeftJustifiedLeftRefLoc(),
+                        breakpoints.getLeftJustifiedRightRefLoc().getStart(), breakpoints.getComplication(), SimpleNovelAdjacencyInterpreter.inferSimpleTypeFromNovelAdjacency(breakpoints),
                         null, evidence, SparkContextFactory.getTestSparkContext().broadcast(SVDiscoveryTestDataProvider.reference),
                         SparkContextFactory.getTestSparkContext().broadcast(SVDiscoveryTestDataProvider.seqDict), null, sampleId);
 

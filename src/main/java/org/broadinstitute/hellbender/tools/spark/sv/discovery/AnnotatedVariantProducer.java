@@ -53,13 +53,13 @@ public class AnnotatedVariantProducer implements Serializable {
             throws IOException {
 
         final VariantContext firstMate =
-                produceAnnotatedVcFromInferredTypeAndRefLocations(novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc, -1,
-                        novelAdjacencyAndInferredAltHaptype.complication, breakendMates._1, null, contigAlignments,
+                produceAnnotatedVcFromInferredTypeAndRefLocations(novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc(), -1,
+                        novelAdjacencyAndInferredAltHaptype.getComplication(), breakendMates._1, null, contigAlignments,
                         broadcastReference, broadcastSequenceDictionary, null, sampleId);
 
         final VariantContext secondMate =
-                produceAnnotatedVcFromInferredTypeAndRefLocations(novelAdjacencyAndInferredAltHaptype.leftJustifiedRightRefLoc, -1,
-                        novelAdjacencyAndInferredAltHaptype.complication, breakendMates._2, null, contigAlignments,
+                produceAnnotatedVcFromInferredTypeAndRefLocations(novelAdjacencyAndInferredAltHaptype.getLeftJustifiedRightRefLoc(), -1,
+                        novelAdjacencyAndInferredAltHaptype.getComplication(), breakendMates._2, null, contigAlignments,
                         broadcastReference, broadcastSequenceDictionary, null, sampleId);
 
         final VariantContextBuilder builder0 = new VariantContextBuilder(firstMate);

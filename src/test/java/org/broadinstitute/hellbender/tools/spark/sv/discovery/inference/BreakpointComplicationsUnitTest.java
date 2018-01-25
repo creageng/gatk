@@ -20,12 +20,12 @@ public class BreakpointComplicationsUnitTest extends GATKBaseTest {
         final AlignmentInterval region1 = new AlignmentInterval(new SimpleInterval("1", 1, 12), 1, 12, TextCigarCodec.decode("12M8S"), true, 60, 1, 100, ContigAlignmentsModifier.AlnModType.NONE);            // dummy test data, almost guaranteed to be non-factual
         final AlignmentInterval region2 = new AlignmentInterval(new SimpleInterval("1", 101, 112), 9, 20, TextCigarCodec.decode("8H12M"), false, 60, 1, 100, ContigAlignmentsModifier.AlnModType.NONE);    // dummy test data, almost guaranteed to be non-factual
 
-        Assert.assertEquals(BreakpointComplications.getHomology(region1, region2, contigSequence), "AAAA");
+        Assert.assertEquals(BreakpointComplications.inferHomology(region1, region2, contigSequence), "AAAA");
 
         final AlignmentInterval region3 = new AlignmentInterval(new SimpleInterval("1", 1, 12), 1, 8, TextCigarCodec.decode("8M"), true, 60, 1, 100, ContigAlignmentsModifier.AlnModType.NONE);            // dummy test data, almost guaranteed to be non-factual
         final AlignmentInterval region4 = new AlignmentInterval(new SimpleInterval("1", 101, 112), 13, 20, TextCigarCodec.decode("8M"), false, 60, 1, 100, ContigAlignmentsModifier.AlnModType.NONE);    // dummy test data, almost guaranteed to be non-factual
 
-        Assert.assertTrue(BreakpointComplications.getHomology(region3, region4, contigSequence).isEmpty());
+        Assert.assertTrue(BreakpointComplications.inferHomology(region3, region4, contigSequence).isEmpty());
     }
 
     @Test(groups = "sv")
@@ -35,10 +35,10 @@ public class BreakpointComplicationsUnitTest extends GATKBaseTest {
         final AlignmentInterval region2 = new AlignmentInterval(new SimpleInterval("1", 175705642, 175705671), 519, 547, TextCigarCodec.decode("518S29M72S"), false, 3, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
         final AlignmentInterval region3 = new AlignmentInterval(new SimpleInterval("1", 118875262, 118875338), 544, 619, TextCigarCodec.decode("543S76M"), false, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
 
-        Assert.assertTrue(BreakpointComplications.getInsertedSequence(region3, region1, contigSequence).isEmpty());
-        Assert.assertEquals(BreakpointComplications.getInsertedSequence(region1, region3, contigSequence), "GAGATAGAGTC");
+        Assert.assertTrue(BreakpointComplications.inferInsertedSequence(region3, region1, contigSequence).isEmpty());
+        Assert.assertEquals(BreakpointComplications.inferInsertedSequence(region1, region3, contigSequence), "GAGATAGAGTC");
 
-        Assert.assertTrue(BreakpointComplications.getInsertedSequence(region2, region1, contigSequence).isEmpty() && BreakpointComplications.getInsertedSequence(region1, region2, contigSequence).isEmpty());
+        Assert.assertTrue(BreakpointComplications.inferInsertedSequence(region2, region1, contigSequence).isEmpty() && BreakpointComplications.inferInsertedSequence(region1, region2, contigSequence).isEmpty());
     }
 
     // -----------------------------------------------------------------------------------------------
@@ -58,9 +58,9 @@ public class BreakpointComplicationsUnitTest extends GATKBaseTest {
                 true, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
 
 
-        final Cigar cigar1 = BreakpointComplications.extractCigarForTandup(region1, 1000125, 1000041);
+        final Cigar cigar1 = BreakpointComplications.SmallDuplicationBreakpointComplications.extractCigarForTandupExpansion(region1, 1000125, 1000041);
         Assert.assertEquals(cigar1, TextCigarCodec.decode("20M30D35M"));
-        final Cigar cigar2 = BreakpointComplications.extractCigarForTandup(region2, 1000125, 1000041);
+        final Cigar cigar2 = BreakpointComplications.SmallDuplicationBreakpointComplications.extractCigarForTandupExpansion(region2, 1000125, 1000041);
         Assert.assertEquals(cigar2, TextCigarCodec.decode("45M30I40M"));
 
         // reverse strand
@@ -71,9 +71,9 @@ public class BreakpointComplicationsUnitTest extends GATKBaseTest {
                 CigarUtils.invertCigar(region1.cigarAlong5to3DirectionOfContig),
                 false, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
 
-        final Cigar cigar3 = BreakpointComplications.extractCigarForTandup(region3, 1000125, 1000041);
+        final Cigar cigar3 = BreakpointComplications.SmallDuplicationBreakpointComplications.extractCigarForTandupExpansion(region3, 1000125, 1000041);
         Assert.assertEquals(CigarUtils.invertCigar(cigar3), cigar2);
-        final Cigar cigar4 = BreakpointComplications.extractCigarForTandup(region4, 1000125, 1000041);
+        final Cigar cigar4 = BreakpointComplications.SmallDuplicationBreakpointComplications.extractCigarForTandupExpansion(region4, 1000125, 1000041);
         Assert.assertEquals(CigarUtils.invertCigar(cigar4), cigar1);
     }
 }

@@ -194,9 +194,9 @@ public final class DiscoverVariantsFromContigAlignmentsSAMSpark extends GATKSpar
                                 final Iterable<ChimericAlignment> evidence = noveltyTypeAndEvidence._2._2;
                                 return AnnotatedVariantProducer
                                         .produceAnnotatedVcFromInferredTypeAndRefLocations(
-                                                novelAdjacency.leftJustifiedLeftRefLoc,
-                                                novelAdjacency.leftJustifiedRightRefLoc.getStart(),
-                                                novelAdjacency.complication,
+                                                novelAdjacency.getLeftJustifiedLeftRefLoc(),
+                                                novelAdjacency.getLeftJustifiedRightRefLoc().getStart(),
+                                                novelAdjacency.getComplication(),
                                                 inferredSimpleType,
                                                 null, // TODO: 1/21/18 implement this for InsDel
                                                 evidence,

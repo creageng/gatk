@@ -4,10 +4,8 @@ import com.esotericsoftware.kryo.DefaultSerializer;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.SAMSequenceDictionary;
 import org.broadinstitute.hellbender.exceptions.GATKException;
-import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AlignedContig;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.StrandSwitch;
 import org.broadinstitute.hellbender.utils.IntervalUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
@@ -19,19 +17,27 @@ import java.util.Arrays;
 /**
  * This class represents a pair of inferred genomic locations on the reference whose novel adjacency is generated
  * due to a simple SV event (in other words, a simple rearrangement between two genomic locations)
- * that is suggested by the input {@link AlignedContig},
- * and complications in pinning down the locations to exact base pair resolution.
+ * that is suggested by the input {@link ChimericAlignment},
+ * and complications as enclosed in {@link BreakpointComplications}
+ * in pinning down the locations to exact base pair resolution.
+ *
+ * <p>
+ *     It essentially represents a bi-path "big" bubble between two reference locations.
+ *     One path is the "reference path" consists of the contiguous block of bases that can be extracted from the reference,
+ *     if possible (i.e. no contiguous block exists between locations from difference chromosomes).
+ *     The other path is encoded with the alt haplotype sequence.
+ * </p>
  */
 @DefaultSerializer(NovelAdjacencyAndInferredAltHaptype.Serializer.class)
 public class NovelAdjacencyAndInferredAltHaptype {
 
-    public final SimpleInterval leftJustifiedLeftRefLoc;
-    public final SimpleInterval leftJustifiedRightRefLoc;
+    private final SimpleInterval leftJustifiedLeftRefLoc;
+    private final SimpleInterval leftJustifiedRightRefLoc;
 
-    public final StrandSwitch strandSwitch;
-    public final BreakpointComplications complication;
+    private final StrandSwitch strandSwitch;
+    private final BreakpointComplications complication;
 
-    public final byte[] altHaplotypeSequence;
+    private final byte[] altHaplotypeSequence;
 
     public NovelAdjacencyAndInferredAltHaptype(final ChimericAlignment chimericAlignment, final byte[] contigSequence,
                                                final SAMSequenceDictionary referenceDictionary) {
@@ -39,20 +45,33 @@ public class NovelAdjacencyAndInferredAltHaptype {
         strandSwitch = chimericAlignment.strandSwitch;
 
         try {
-            complication = new BreakpointComplications(chimericAlignment, contigSequence);
 
-            final Tuple2<SimpleInterval, SimpleInterval> leftJustifiedBreakpoints =
-                    leftJustifyBreakpoints(chimericAlignment, complication, referenceDictionary);
+            final BreakpointsInference inferredClass =
+                    BreakpointsInference.getInferenceClass(chimericAlignment, contigSequence, referenceDictionary);
+
+            final Tuple2<SimpleInterval, SimpleInterval> leftJustifiedBreakpoints = inferredClass.getLeftJustifiedBreakpoints();
             leftJustifiedLeftRefLoc = leftJustifiedBreakpoints._1();
             leftJustifiedRightRefLoc = leftJustifiedBreakpoints._2();
 
-            altHaplotypeSequence =
-                    SimpleNovelAdjacencyInterpreter.BreakpointsInference.getInferenceClass(chimericAlignment, complication, referenceDictionary)
-                            .getInferredAltHaplotypeSequence();
+            complication = inferredClass.getComplications();
+
+            validateInferredLocations(leftJustifiedLeftRefLoc, leftJustifiedRightRefLoc, referenceDictionary,
+                                      chimericAlignment, complication);
+
+            altHaplotypeSequence = inferredClass.getInferredAltHaplotypeSequence();
+
         } catch (final IllegalArgumentException iaex) { // catching IAEX specifically because it is the most likely exception thrown if there's bug, this helps quickly debugging what the problem is
             throw new GATKException("Erred when inferring breakpoint location and event type from chimeric alignment:\n" +
                     chimericAlignment.toString(), iaex);
         }
+    }
+
+    public boolean hasInsertedSequence() {
+        return ! complication.getInsertedSequenceForwardStrandRep().isEmpty();
+    }
+
+    public boolean hasDuplicationAnnotation() {
+        return complication.indicatesRefSeqDuplicated();
     }
 
     protected NovelAdjacencyAndInferredAltHaptype(final Kryo kryo, final Input input) {
@@ -78,25 +97,6 @@ public class NovelAdjacencyAndInferredAltHaptype {
                 altHaplotypeSequence[i] = input.readByte();
             }
         }
-    }
-
-    /**
-     * Returns the reference coordinates of the upstream and downstream breakpoints implied by input {@code chimericAlignment}.
-     * If there is homologous sequence represented in the alignments, it will be assigned to the side of the breakpoint
-     * with higher reference coordinates, i.e. we follow left alignment convention here.
-     */
-    @VisibleForTesting
-    static Tuple2<SimpleInterval, SimpleInterval> leftJustifyBreakpoints(final ChimericAlignment chimericAlignment,
-                                                                         final BreakpointComplications complication,
-                                                                         final SAMSequenceDictionary referenceDictionary) {
-
-        final Tuple2<SimpleInterval, SimpleInterval> leftAdjustedBreakpoints =
-                SimpleNovelAdjacencyInterpreter.BreakpointsInference.getInferenceClass(chimericAlignment, complication, referenceDictionary)
-                        .getLeftJustifiedBreakpoints();
-
-        validateInferredLocations(leftAdjustedBreakpoints._1, leftAdjustedBreakpoints._2, referenceDictionary, chimericAlignment, complication);
-
-        return leftAdjustedBreakpoints;
     }
 
     private static void validateInferredLocations(final SimpleInterval leftBreakpoint, final SimpleInterval rightBreakpoint,
@@ -161,6 +161,26 @@ public class NovelAdjacencyAndInferredAltHaptype {
                 output.writeByte(b);
             }
         }
+    }
+
+    public SimpleInterval getLeftJustifiedLeftRefLoc() {
+        return leftJustifiedLeftRefLoc;
+    }
+
+    public SimpleInterval getLeftJustifiedRightRefLoc() {
+        return leftJustifiedRightRefLoc;
+    }
+
+    public StrandSwitch getStrandSwitch() {
+        return strandSwitch;
+    }
+
+    public BreakpointComplications getComplication() {
+        return complication;
+    }
+
+    public byte[] getAltHaplotypeSequence() {
+        return altHaplotypeSequence;
     }
 
     public static final class Serializer extends com.esotericsoftware.kryo.Serializer<NovelAdjacencyAndInferredAltHaptype> {

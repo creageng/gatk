@@ -2,6 +2,7 @@ package org.broadinstitute.hellbender.tools.spark.sv.discovery;
 
 import htsjdk.variant.variantcontext.Allele;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.StrandSwitch;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.BreakpointComplications;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.NovelAdjacencyAndInferredAltHaptype;
 import org.broadinstitute.hellbender.tools.spark.sv.evidence.EvidenceTargetLink;
 import org.broadinstitute.hellbender.tools.spark.sv.evidence.ReadMetadata;
@@ -33,15 +34,15 @@ public abstract class SimpleSVType extends SvType {
         public Inversion(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
             super(getIDString(novelAdjacencyAndInferredAltHaptype),
                     Allele.create(createBracketedSymbAlleleString(GATKSVVCFConstants.SYMB_ALT_ALLELE_INV)),
-                    novelAdjacencyAndInferredAltHaptype.leftJustifiedRightRefLoc.getStart() - novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getEnd(),
-                    Collections.singletonMap((novelAdjacencyAndInferredAltHaptype.strandSwitch == StrandSwitch.FORWARD_TO_REVERSE) ? GATKSVVCFConstants.INV55 : GATKSVVCFConstants.INV33, ""));
+                    novelAdjacencyAndInferredAltHaptype.getLeftJustifiedRightRefLoc().getStart() - novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getEnd(),
+                    Collections.singletonMap((novelAdjacencyAndInferredAltHaptype.getStrandSwitch() == StrandSwitch.FORWARD_TO_REVERSE) ? GATKSVVCFConstants.INV55 : GATKSVVCFConstants.INV33, ""));
         }
 
         private static String getIDString(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
-            final String contig = novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getContig();
-            final int start = novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getEnd();
-            final int end = novelAdjacencyAndInferredAltHaptype.leftJustifiedRightRefLoc.getStart();
-            final StrandSwitch strandSwitch = novelAdjacencyAndInferredAltHaptype.strandSwitch;
+            final String contig = novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getContig();
+            final int start = novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getEnd();
+            final int end = novelAdjacencyAndInferredAltHaptype.getLeftJustifiedRightRefLoc().getStart();
+            final StrandSwitch strandSwitch = novelAdjacencyAndInferredAltHaptype.getStrandSwitch();
 
             return (strandSwitch.equals(StrandSwitch.FORWARD_TO_REVERSE) ? GATKSVVCFConstants.INV55 : GATKSVVCFConstants.INV33) + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR +
                     contig + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR + start + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR + end;
@@ -59,17 +60,17 @@ public abstract class SimpleSVType extends SvType {
         public Deletion(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
             super(getIDString(novelAdjacencyAndInferredAltHaptype),
                     Allele.create(createBracketedSymbAlleleString(GATKSVVCFConstants.SYMB_ALT_ALLELE_DEL)),
-                    -(novelAdjacencyAndInferredAltHaptype.leftJustifiedRightRefLoc.getStart() - novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getEnd()),
-                    novelAdjacencyAndInferredAltHaptype.complication.hasDuplicationAnnotation() ? Collections.singletonMap(GATKSVVCFConstants.DUP_TAN_CONTRACTION_STRING, "") : Collections.EMPTY_MAP);
+                    -(novelAdjacencyAndInferredAltHaptype.getLeftJustifiedRightRefLoc().getStart() - novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getEnd()),
+                    novelAdjacencyAndInferredAltHaptype.hasDuplicationAnnotation() ? Collections.singletonMap(GATKSVVCFConstants.DUP_TAN_CONTRACTION_STRING, "") : Collections.EMPTY_MAP);
         }
 
         private static String getIDString(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
 
-            return  ((novelAdjacencyAndInferredAltHaptype.complication.hasDuplicationAnnotation()) ? GATKSVVCFConstants.DUP_TAN_CONTRACTION_INTERNAL_ID_START_STRING : TYPES.DEL.name())
+            return  ((novelAdjacencyAndInferredAltHaptype.hasDuplicationAnnotation()) ? GATKSVVCFConstants.DUP_TAN_CONTRACTION_INTERNAL_ID_START_STRING : TYPES.DEL.name())
                     + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getContig() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getEnd() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedRightRefLoc.getStart();
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getContig() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getEnd() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedRightRefLoc().getStart();
         }
     }
 
@@ -84,16 +85,16 @@ public abstract class SimpleSVType extends SvType {
         public Insertion(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
             super(getIDString(novelAdjacencyAndInferredAltHaptype),
                     Allele.create(createBracketedSymbAlleleString(GATKSVVCFConstants.SYMB_ALT_ALLELE_INS)),
-                    novelAdjacencyAndInferredAltHaptype.complication.getInsertedSequenceForwardStrandRep().length(),
+                    novelAdjacencyAndInferredAltHaptype.getComplication().getInsertedSequenceForwardStrandRep().length(),
                     Collections.EMPTY_MAP);
         }
 
         private static String getIDString(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
 
             return TYPES.INS.name() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getContig() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getEnd() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedRightRefLoc.getStart();
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getContig() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getEnd() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedRightRefLoc().getStart();
         }
     }
 
@@ -107,17 +108,23 @@ public abstract class SimpleSVType extends SvType {
         public DuplicationTandem(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
             super(getIDString(novelAdjacencyAndInferredAltHaptype),
                     Allele.create(createBracketedSymbAlleleString(GATKSVVCFConstants.SYMB_ALT_ALLELE_DUP)),
-                    novelAdjacencyAndInferredAltHaptype.complication.getInsertedSequenceForwardStrandRep().length()
-                            + (novelAdjacencyAndInferredAltHaptype.complication.getDupSeqRepeatNumOnCtg() - novelAdjacencyAndInferredAltHaptype.complication.getDupSeqRepeatNumOnRef())* novelAdjacencyAndInferredAltHaptype.complication.getDupSeqRepeatUnitRefSpan().size(),
+                    getLength(novelAdjacencyAndInferredAltHaptype),
                     Collections.singletonMap(GATKSVVCFConstants.DUP_TAN_EXPANSION_STRING, ""));
+        }
+
+        static int getLength(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
+            final BreakpointComplications.SmallDuplicationBreakpointComplications complication = (BreakpointComplications.SmallDuplicationBreakpointComplications)
+                    novelAdjacencyAndInferredAltHaptype.getComplication();
+            return complication.getInsertedSequenceForwardStrandRep().length()
+                    + (complication.getDupSeqRepeatNumOnCtg() - complication.getDupSeqRepeatNumOnRef()) * complication.getDupSeqRepeatUnitRefSpan().size();
         }
 
         private static String getIDString(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
 
             return GATKSVVCFConstants.DUP_TAN_EXPANSION_INTERNAL_ID_START_STRING + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getContig() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getEnd() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedRightRefLoc.getStart();
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getContig() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getEnd() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedRightRefLoc().getStart();
         }
     }
 
@@ -163,15 +170,21 @@ public abstract class SimpleSVType extends SvType {
         public DuplicationInverted(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
             super(getIDString(novelAdjacencyAndInferredAltHaptype),
                     Allele.create(createBracketedSymbAlleleString(GATKSVVCFConstants.SYMB_ALT_ALLELE_INVDUP)),
-                    novelAdjacencyAndInferredAltHaptype.complication.getDupSeqRepeatUnitRefSpan().size(),
+                    getSize(novelAdjacencyAndInferredAltHaptype),
                     Collections.EMPTY_MAP);
+        }
+
+        static int getSize(NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
+            final BreakpointComplications.IntraChrStrandSwitchBreakpointComplications complication = (BreakpointComplications.IntraChrStrandSwitchBreakpointComplications)
+                    novelAdjacencyAndInferredAltHaptype.getComplication();
+            return complication.getDupSeqRepeatUnitRefSpan().size();
         }
 
         private static String getIDString(final NovelAdjacencyAndInferredAltHaptype novelAdjacencyAndInferredAltHaptype) {
             return GATKSVVCFConstants.DUP_INV_INTERNAL_ID_START_STRING + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getContig() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getEnd() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
-                    + novelAdjacencyAndInferredAltHaptype.leftJustifiedRightRefLoc.getStart();
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getContig() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getEnd() + GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR
+                    + novelAdjacencyAndInferredAltHaptype.getLeftJustifiedRightRefLoc().getStart();
         }
     }
 

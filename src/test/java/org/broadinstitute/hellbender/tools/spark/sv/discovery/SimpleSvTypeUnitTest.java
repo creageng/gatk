@@ -35,7 +35,7 @@ public class SimpleSvTypeUnitTest extends GATKBaseTest {
                                final String expectedFirstFieldInIdString) throws IOException {
 
         final SvType SvType = SimpleNovelAdjacencyInterpreter.inferSimpleTypeFromNovelAdjacency(novelAdjacencyAndInferredAltHaptype);
-        final List<Allele> producedAlleles = AnnotatedVariantProducer.produceAlleles(novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc, SVDiscoveryTestDataProvider.reference, SvType);
+        final List<Allele> producedAlleles = AnnotatedVariantProducer.produceAlleles(novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc(), SVDiscoveryTestDataProvider.reference, SvType);
 
         Assert.assertEquals(producedAlleles.size(), 2);
         Assert.assertTrue(producedAlleles.get(0).isReference() && producedAlleles.get(1).isNonReference());
@@ -48,9 +48,9 @@ public class SimpleSvTypeUnitTest extends GATKBaseTest {
         final String[] fields = variantId.split(GATKSVVCFConstants.INTERVAL_VARIANT_ID_FIELD_SEPARATOR);
         Assert.assertEquals(fields.length, 4);
         Assert.assertEquals(fields[0], expectedFirstFieldInIdString);
-        final String expectedSecondField = novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getContig(),
-                expectedThirdField  = String.valueOf(novelAdjacencyAndInferredAltHaptype.leftJustifiedLeftRefLoc.getEnd()),
-                expectedFourthField = String.valueOf(novelAdjacencyAndInferredAltHaptype.leftJustifiedRightRefLoc.getStart());
+        final String expectedSecondField = novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getContig(),
+                expectedThirdField  = String.valueOf(novelAdjacencyAndInferredAltHaptype.getLeftJustifiedLeftRefLoc().getEnd()),
+                expectedFourthField = String.valueOf(novelAdjacencyAndInferredAltHaptype.getLeftJustifiedRightRefLoc().getStart());
         Assert.assertEquals(fields[1], expectedSecondField);
         Assert.assertEquals(fields[2], expectedThirdField);
         Assert.assertEquals(fields[3], expectedFourthField);
