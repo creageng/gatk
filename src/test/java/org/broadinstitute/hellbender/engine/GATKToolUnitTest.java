@@ -168,26 +168,6 @@ public final class GATKToolUnitTest extends GATKBaseTest {
         }
     }
 
-    @CommandLineProgramProperties(
-            summary = "TestGATKToolWithSuppressedFileExpansion",
-            oneLineSummary = "TestGATKToolWithSuppressedFileExpansion",
-            programGroup = TestProgramGroup.class
-    )
-    private static final class TestGATKToolWithSuppressedFileExpansion extends GATKTool{
-
-        @Argument(fullName = "suppressedExpansionArg", suppressFileExpansion = true)
-        List<String> suppressedExpansionArg = new ArrayList<>();
-
-        @Override
-        public void traverse() {
-            //no op
-        }
-
-        public List<String> getSuppressedExpansionArg() {
-            return suppressedExpansionArg;
-        }
-    }
-
     @DataProvider
     public Object[][] sequenceDictionaryTestValuesCompatible() {
 
@@ -370,28 +350,6 @@ public final class GATKToolUnitTest extends GATKBaseTest {
         Assert.assertEquals(tool.getIntervals().size(), 3);
 
         tool.onShutdown();
-    }
-
-    @DataProvider(name = "commandLineExpansionExtensions")
-    private Object[][] commandLineExpansionExtensions() {
-        return new Object[][]{
-                {createTempFile("testExpansionSuppression", ".list")},
-                {createTempFile("testExpansionSuppression", ".args")},
-        };
-    }
-
-    @Test(dataProvider = "commandLineExpansionExtensions")
-    public void testPicardListExpansionSuppression(final File testFile) throws IOException {
-        final TestGATKToolWithSuppressedFileExpansion tool = new TestGATKToolWithSuppressedFileExpansion();
-        final CommandLineParser clp = new CommandLineArgumentParser(tool);
-        final String[] args = {
-                "--suppressedExpansionArg", testFile.getCanonicalPath(),
-        };
-        clp.parseArguments(System.out, args);
-        // file expansion is suppressed, so the list should contain the actual file name, not the contents
-        Assert.assertEquals(
-                tool.getSuppressedExpansionArg(),
-                Collections.singletonList(testFile.getCanonicalPath()));
     }
 
     @Test
