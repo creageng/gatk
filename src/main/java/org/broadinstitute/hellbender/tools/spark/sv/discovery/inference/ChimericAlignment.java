@@ -11,6 +11,8 @@ import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.Alignmen
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AssemblyContigWithFineTunedAlignments;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.StrandSwitch;
 import org.broadinstitute.hellbender.utils.IntervalUtils;
+import org.broadinstitute.hellbender.utils.SimpleInterval;
+import org.broadinstitute.hellbender.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -191,6 +193,52 @@ public class ChimericAlignment {
         }
     }
 
+    /**
+     * Struct to represent the (distance - 1) between boundaries of the two alignments represented by this CA,
+     * on reference, and on read.
+     * For example,
+     * two alignments have ref spans  1:100-200, 1:151-250
+     *                     read spans 1:100, 81-181
+     * then their distance on reference would be -50, and on read would be -20.
+     *
+     * Note that
+     *
+     * Note that this concept is ONLY applicable to chimeric alignments that are
+     * {@link #isNeitherSimpleTranslocationNorIncompletePicture()} and
+     * {@link #determineStrandSwitch(AlignmentInterval, AlignmentInterval)} == {@link StrandSwitch#NO_SWITCH}
+     */
+    static final class DistancesBetweenAlignmentsOnRefAndOnRead {
+        final int distBetweenAlignRegionsOnRef; // distance-1 between the two regions on reference, denoted as d1 in the comments below
+        final int distBetweenAlignRegionsOnCtg; // distance-1 between the two regions on contig, denoted as d2 in the comments below
+
+        DistancesBetweenAlignmentsOnRefAndOnRead(final ChimericAlignment simpleChimera) {
+            Utils.validateArg(simpleChimera.isNeitherSimpleTranslocationNorIncompletePicture(),
+                    "Assumption that the simple chimera is neither incomplete picture nor simple translocation is violated.\n" +
+                            simpleChimera.toString());
+            Utils.validateArg(simpleChimera.strandSwitch.equals(StrandSwitch.NO_SWITCH),
+                    "Assumption that the simple chimera is neither incomplete picture nor simple translocation is violated.\n" +
+                            simpleChimera.toString());
+            final AlignmentInterval firstContigRegion  = simpleChimera.regionWithLowerCoordOnContig;
+            final AlignmentInterval secondContigRegion = simpleChimera.regionWithHigherCoordOnContig;
+            final SimpleInterval leftReferenceSpan, rightReferenceSpan;
+            if (simpleChimera.isForwardStrandRepresentation) {
+                leftReferenceSpan = firstContigRegion.referenceSpan;
+                rightReferenceSpan = secondContigRegion.referenceSpan;
+            } else {
+                leftReferenceSpan = secondContigRegion.referenceSpan;
+                rightReferenceSpan = firstContigRegion.referenceSpan;
+            }
+
+            final int r1e = leftReferenceSpan.getEnd(),
+                    r2b = rightReferenceSpan.getStart(),
+                    c1e = firstContigRegion.endInAssembledContig,
+                    c2b = secondContigRegion.startInAssembledContig;
+
+            distBetweenAlignRegionsOnRef = r2b - r1e - 1;
+            distBetweenAlignRegionsOnCtg = c2b - c1e - 1;
+        }
+    }
+
     // =================================================================================================================
 
     /**
@@ -233,9 +281,8 @@ public class ChimericAlignment {
     }
 
     // =================================================================================================================
-    //////////// BELOW ARE CODE PATH USED FOR INSERTION, DELETION, AND DUPLICATION (INV OR NOT) AND INVERSION, AND ARE TESTED ONLY FOR THAT PURPOSE
+    // TODO: 1/24/18 to be phased out by block above
 
-    // TODO: 1/24/18 to be phased out by #extractSimpleChimera()
     /**
      * Parse all alignment records for a single locally-assembled contig and generate chimeric alignments if available.
      * Applies certain filters to skip the input alignment regions that are:

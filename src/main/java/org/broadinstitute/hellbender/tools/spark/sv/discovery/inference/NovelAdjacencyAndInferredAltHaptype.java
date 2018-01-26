@@ -6,7 +6,6 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import htsjdk.samtools.SAMSequenceDictionary;
 import org.broadinstitute.hellbender.exceptions.GATKException;
-import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.AlignedContig;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.StrandSwitch;
 import org.broadinstitute.hellbender.utils.IntervalUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
@@ -18,8 +17,16 @@ import java.util.Arrays;
 /**
  * This class represents a pair of inferred genomic locations on the reference whose novel adjacency is generated
  * due to a simple SV event (in other words, a simple rearrangement between two genomic locations)
- * that is suggested by the input {@link AlignedContig},
- * and complications in pinning down the locations to exact base pair resolution.
+ * that is suggested by the input {@link ChimericAlignment},
+ * and complications as enclosed in {@link BreakpointComplications}
+ * in pinning down the locations to exact base pair resolution.
+ *
+ * <p>
+ *     It essentially represents a bi-path "big" bubble between two reference locations.
+ *     One path is the "reference path" consists of the contiguous block of bases that can be extracted from the reference,
+ *     if possible (i.e. no contiguous block exists between locations from difference chromosomes).
+ *     The other path is encoded with the alt haplotype sequence.
+ * </p>
  */
 @DefaultSerializer(NovelAdjacencyAndInferredAltHaptype.Serializer.class)
 public class NovelAdjacencyAndInferredAltHaptype {

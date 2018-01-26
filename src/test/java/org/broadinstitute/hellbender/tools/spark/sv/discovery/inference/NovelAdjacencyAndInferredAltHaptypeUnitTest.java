@@ -28,8 +28,6 @@ import java.util.List;
 
 public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
 
-    static final BreakpointComplications DEFAULT_BREAKPOINT_COMPLICATIONS = new BreakpointComplications();
-
 
     /**
      * Hack to force trigger test data generation.
@@ -214,13 +212,6 @@ public class NovelAdjacencyAndInferredAltHaptypeUnitTest extends GATKBaseTest {
     // -----------------------------------------------------------------------------------------------
     // Tests for complication resolving and breakpoint justification with the inferred complications for insertion and deletion
     // -----------------------------------------------------------------------------------------------
-    @Test(expectedExceptions = GATKException.class)
-    public void testGetBreakpoints_ExpectException() {
-        final AlignmentInterval region1 = new AlignmentInterval(new SimpleInterval("21", 100001, 100100), 1 ,100, TextCigarCodec.decode("100M"), true, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
-        final AlignmentInterval region2 = new AlignmentInterval(new SimpleInterval("21", 100101, 100200), 101 ,200, TextCigarCodec.decode("100M"), true, 60, 0, 100, ContigAlignmentsModifier.AlnModType.NONE);
-        final ChimericAlignment chimericAlignment = new ChimericAlignment(region1, region2, Collections.emptyList(), "1", SVDiscoveryTestDataProvider.seqDict);
-        new BreakpointComplications(chimericAlignment, SVDiscoveryTestDataProvider.makeDummySequence(200, (byte)'A'));
-    }
 
     /**
      * @see SVDiscoveryTestDataProvider#forSimpleDeletion(ByteArrayOutputStream)
