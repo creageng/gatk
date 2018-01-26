@@ -213,3 +213,45 @@ task ScatterIntervals {
         Array[File] scattered_interval_lists = glob("${base_filename}.scattered.*.interval_list")
     }
 }
+
+task GenerateVCFFromPosteriors {
+    Array[File] chunk_tars
+    String sample_directory
+    String entity_id
+    File? gatk4_jar_override
+
+    # Runtime parameters
+    Int? mem_gb
+    String gatk_docker
+    Int? preemptible_attempts
+    Int? disk_space_gb
+
+    Int machine_mem_mb = select_first([mem_gb, 7]) * 1000
+    Int command_mem_mb = machine_mem_mb - 1000
+
+    Array[File] chunk_paths = #generate
+    String vcf_filename = "${entity_id}.vcf"
+
+    command <<<
+        set -e
+        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
+
+        #untar chunk_tars to chunk_paths
+
+        gatk --java-options "-Xmx${command_mem_mb}m" GenerateVCFFromPosteriors \
+            --chunk-path ${sep= " --chunk-path " chunk_paths} \
+            --sample-directory ${sample_name_directory} \
+            --output ${vcf_filename}
+    >>>
+
+    runtime {
+        docker: "${gatk_docker}"
+        memory: machine_mem_mb + " MB"
+        disks: "local-disk " + select_first([disk_space_gb, ceil(size(bam, "GB")) + 50]) + " HDD"
+        preemptible: select_first([preemptible_attempts, 5])
+    }
+
+    output {
+        File vcf_filename = vcf_filename
+    }
+}
