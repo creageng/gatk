@@ -26,7 +26,7 @@ public interface AnnotatedGenomicRegionWriter extends Closeable {
 
     /** Write one region to the file.
      *
-     * @param simpleAnnotatedGenomicRegion
+     * @param simpleAnnotatedGenomicRegion region to write
      */
     void add(final SimpleAnnotatedGenomicRegion simpleAnnotatedGenomicRegion);
 }
