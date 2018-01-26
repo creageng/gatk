@@ -19,7 +19,7 @@ public interface AnnotatedGenomicRegionWriter extends Closeable {
                      final String contigColumnName, final String startColumnName, final String endColumnName);
 
     /**
-     * attempt to close the VCF file
+     * attempt to close the file
      */
     @Override
     void close() ;
