@@ -55,7 +55,8 @@ public abstract class IntervalArgumentCollection implements Serializable {
      * (e.g. -XL myFile.intervals).
      * @return strings gathered from the command line -XL argument to be parsed into intervals to exclude
      */
-    @Argument(fullName = EXCLUDE_INTERVALS_LONG_NAME, shortName = "XL", doc = "One or more genomic intervals to exclude from processing", optional = true, common = true)
+    @Argument(fullName = EXCLUDE_INTERVALS_LONG_NAME, shortName = "XL", doc = "One or more genomic intervals to exclude from processing",
+            suppressFileExpansion = true, optional = true, common = true)
     protected final List<String> excludeIntervalStrings = new ArrayList<>();
 
     /**

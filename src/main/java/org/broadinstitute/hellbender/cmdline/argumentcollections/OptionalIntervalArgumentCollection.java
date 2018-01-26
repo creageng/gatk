@@ -15,7 +15,7 @@ public final class OptionalIntervalArgumentCollection extends IntervalArgumentCo
     private static final long serialVersionUID = 1L;
 
     @Argument(fullName = StandardArgumentDefinitions.INTERVALS_LONG_NAME, shortName = StandardArgumentDefinitions.INTERVALS_SHORT_NAME,
-            doc = "One or more genomic intervals over which to operate", optional = true)
+            suppressFileExpansion = true, doc = "One or more genomic intervals over which to operate", optional = true)
     protected final List<String> intervalStrings = new ArrayList<>();
 
     @Override
