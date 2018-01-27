@@ -219,7 +219,7 @@ public class SimpleAnnotatedGenomicRegionCollection {
 
         Utils.validateArg(Files.isWritable(outputFile.toPath()), "Can not write to: " + outputFile.getAbsolutePath());
 
-        final AnnotatedGenomicRegionWriter writer = new SimpleAnnotatedGenomicRegionWriter(outputFile, this);
+        final AnnotatedGenomicRegionWriter writer = new SimpleAnnotatedGenomicRegionWriter(this, outputFile);
         writer.writeHeader(getSamFileHeader().getSAMString(), getComments(), getAnnotations(), contigColumnName,
                 startColumnName, endColumnName);
         getRecords().forEach(writer::add);
